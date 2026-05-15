@@ -2,9 +2,10 @@ export class InputController {
   constructor() {
     this.keys = { w: false, a: false, s: false, d: false };
     this.onReset = null;
+    this.onToggleCamera = null;
     this.onTelemetry = null;
     this.lastStateSignature = '';
-    console.info('[Input:init] Input controller ready. Keys: W/A/S/D + R reset');
+    console.info('[Input:init] Input controller ready. Keys: W/A/S/D + R reset + C camera');
 
     window.addEventListener('keydown', (event) => this.handleKeyDown(event));
     window.addEventListener('keyup', (event) => this.handleKeyUp(event));
@@ -28,6 +29,7 @@ export class InputController {
       }
     }
     if (key === 'r' && this.onReset) this.onReset();
+    if (key === 'c' && this.onToggleCamera) this.onToggleCamera();
   }
 
   handleKeyUp(event) {

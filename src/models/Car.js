@@ -35,11 +35,34 @@ export class Car {
     this.yawInertiaScale = 0.72;
     this.yawControl = 4200;
     this.yawDamping = 950;
-    this.accelRate = 19;
+    this.accelRate = 4.0;
     this.brakeRate = 26;
-    this.reverseAccelRate = 7.5;
+    this.reverseAccelRate = 2.0;
     this.coastDecelRate = 0.18;
     this.maxReverseSpeedMps = 16;
+    this.gear = 1;
+    this.maxForwardGear = 5;
+    this.idleRpm = 900;
+    this.redlineRpm = 7600;
+    this.shiftSuggestRpm = 6600;
+    this.gearRatios = {
+      '-1': 0.45,
+      '0': 0,
+      '1': 1.0,
+      '2': 0.8,
+      '3': 0.64,
+      '4': 0.5,
+      '5': 0.38,
+    };
+    this.gearSpeedCaps = {
+      '-1': 12,
+      '0': 56,
+      '1': 12,
+      '2': 22,
+      '3': 32,
+      '4': 43,
+      '5': 56,
+    };
     this.tractionLimitBase = 10.5;
     this.tractionLimitSpeedFactor = 0.05;
     this.tractionSlipLoss = 0.42;
@@ -116,7 +139,16 @@ export class Car {
   }
 
   updatePhysics(input, dt) {
-    const targetSteer = (input.left ? 1 : 0) - (input.right ? 1 : 0);
+    const steerAxis = typeof input.steerAxis === 'number'
+      ? THREE.MathUtils.clamp(input.steerAxis, -1, 1)
+      : THREE.MathUtils.clamp((input.right ? 1 : 0) - (input.left ? 1 : 0), -1, 1);
+    const throttleInput = typeof input.throttleAxis === 'number'
+      ? THREE.MathUtils.clamp(input.throttleAxis, 0, 1)
+      : (input.forward ? 1 : 0);
+    const brakeInput = typeof input.brakeAxis === 'number'
+      ? THREE.MathUtils.clamp(input.brakeAxis, 0, 1)
+      : (input.backward ? 1 : 0);
+    const targetSteer = steerAxis;
     const speedMps = Math.sqrt(this.body.velocity.x * this.body.velocity.x + this.body.velocity.z * this.body.velocity.z);
     const steerResponse = THREE.MathUtils.lerp(
       this.steerResponseLowSpeed,
@@ -144,18 +176,25 @@ export class Car {
     const steerAngle = this.steer * steerLimit;
 
     let nextForwardSpeed = speedForward;
-    if (input.forward) {
-      nextForwardSpeed += this.accelRate * dt;
-      nextForwardSpeed = Math.min(nextForwardSpeed, this.topSpeedMps);
-    } else if (input.backward) {
+    const gearRatio = this.gearRatios[String(this.gear)] ?? 0;
+    const gearSpeedCap = this.gearSpeedCaps[String(this.gear)] ?? this.topSpeedMps;
+    if (this.gear > 0 && throttleInput > 0.01) {
+      nextForwardSpeed += this.accelRate * gearRatio * throttleInput * dt;
+      nextForwardSpeed = Math.min(nextForwardSpeed, gearSpeedCap);
+    } else if (this.gear < 0 && throttleInput > 0.01) {
+      nextForwardSpeed -= this.reverseAccelRate * Math.abs(gearRatio) * throttleInput * dt;
+      nextForwardSpeed = Math.max(nextForwardSpeed, -gearSpeedCap);
+    } else if (brakeInput > 0.01) {
       if (speedForward > 1.5) {
         const frontBrake = this.brakeRate * this.brakeBiasFront;
         const rearBrake = this.brakeRate * (1 - this.brakeBiasFront);
-        nextForwardSpeed -= (frontBrake + rearBrake * 0.92) * dt;
+        nextForwardSpeed -= (frontBrake + rearBrake * 0.92) * brakeInput * dt;
         nextForwardSpeed = Math.max(0, nextForwardSpeed);
+      } else if (speedForward < -1.5) {
+        nextForwardSpeed += this.brakeRate * brakeInput * dt;
+        nextForwardSpeed = Math.min(0, nextForwardSpeed);
       } else {
-        nextForwardSpeed -= this.reverseAccelRate * dt;
-        nextForwardSpeed = Math.max(-this.maxReverseSpeedMps, nextForwardSpeed);
+        nextForwardSpeed = 0;
       }
     } else {
       const coastFactor = Math.max(0, 1 - this.coastDecelRate * dt);
@@ -242,7 +281,44 @@ export class Car {
     this.body.force.set(0, 0, 0);
     this.body.torque.set(0, 0, 0);
     this.steer = 0;
+    this.gear = 1;
     this.syncVisuals();
+  }
+
+  shiftUp() {
+    this.gear = Math.min(this.maxForwardGear, this.gear + 1);
+    console.info('[Input:shift]', { direction: 'up', gear: this.getGearLabel() });
+  }
+
+  shiftDown() {
+    this.gear = Math.max(-1, this.gear - 1);
+    console.info('[Input:shift]', { direction: 'down', gear: this.getGearLabel() });
+  }
+
+  getGearLabel() {
+    if (this.gear < 0) return 'R';
+    if (this.gear === 0) return 'N';
+    return String(this.gear);
+  }
+
+  getEngineState() {
+    const forward = this.body.vectorToWorldFrame(new CANNON.Vec3(0, 0, 1));
+    const speedForward = this.body.velocity.dot(forward);
+    const speedAbs = Math.abs(speedForward);
+    const gearKey = String(this.gear);
+    const gearCap = this.gearSpeedCaps[gearKey] ?? this.topSpeedMps;
+    const normalized = THREE.MathUtils.clamp(speedAbs / Math.max(gearCap, 0.1), 0, 1);
+    const rpmRange = this.redlineRpm - this.idleRpm;
+    const rpm = Math.round(this.idleRpm + rpmRange * normalized);
+    const shouldShiftUp = this.gear > 0 && this.gear < this.maxForwardGear && rpm >= this.shiftSuggestRpm;
+    return {
+      rpm,
+      idleRpm: this.idleRpm,
+      redlineRpm: this.redlineRpm,
+      shiftSuggestRpm: this.shiftSuggestRpm,
+      normalized,
+      shouldShiftUp,
+    };
   }
 
   getDebugState() {
@@ -260,6 +336,7 @@ export class Car {
       steer: this.steer,
       driveForce: this.lastDriveForce,
       yawTorque: this.lastYawTorque,
+      gear: this.gear,
       brakeBiasFront: this.brakeBiasFront,
       weightTransferLong: this.weightTransferLong,
       weightTransferLat: this.weightTransferLat,

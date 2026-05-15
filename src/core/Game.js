@@ -3,6 +3,7 @@ import * as CANNON from 'cannon-es';
 import { Track } from '../models/Track.js';
 import { Car } from '../models/Car.js';
 import { InputController } from './InputController.js';
+import { GamepadController } from './GamepadController.js';
 
 export class Game {
   constructor({ container, hud }) {
@@ -23,7 +24,10 @@ export class Game {
 
     this.clock = new THREE.Clock();
     this.camOffset = new THREE.Vector3(0, 3.2, -7.5);
+    this.firstPersonOffset = new THREE.Vector3(0, 1.02, 0.18);
+    this.firstPersonLookAhead = new THREE.Vector3(0, 1.02, 12);
     this.lookAt = new THREE.Vector3();
+    this.cameraMode = 'chase';
     this.prevVel = new THREE.Vector3();
     this.lapTime = 0;
     this.frameCount = 0;
@@ -39,6 +43,7 @@ export class Game {
     this.track = null;
     this.car = null;
     this.input = new InputController();
+    this.gamepadInput = new GamepadController();
   }
 
   init() {
@@ -47,7 +52,13 @@ export class Game {
     this.setupWorld();
     this.setupTuningUi();
     this.input.onReset = () => this.reset();
+    this.input.onToggleCamera = () => this.toggleCameraMode();
     this.input.onTelemetry = (payload) => this.logInputTelemetry(payload);
+    this.gamepadInput.onReset = () => this.reset();
+    this.gamepadInput.onToggleCamera = () => this.toggleCameraMode();
+    this.gamepadInput.onShiftUp = () => this.car?.shiftUp();
+    this.gamepadInput.onShiftDown = () => this.car?.shiftDown();
+    this.gamepadInput.onTelemetry = (payload) => this.logInputTelemetry(payload);
     console.info('[Game:init] Scene, world, track, and car initialized');
 
     window.addEventListener('resize', () => this.onResize());
@@ -74,10 +85,10 @@ export class Game {
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(2000, 2000),
-      new THREE.MeshStandardMaterial({ color: 0x7d8a77, roughness: 0.96, metalness: 0 })
+      new THREE.MeshStandardMaterial({ color: 0x2f8f3d, roughness: 0.98, metalness: 0 })
     );
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.03;
+    ground.position.y = -0.2;
     ground.receiveShadow = true;
     this.scene.add(ground);
   }
@@ -142,6 +153,14 @@ export class Game {
 
   updateCamera() {
     const carMesh = this.car.mesh;
+    if (this.cameraMode === 'first-person') {
+      const eye = this.firstPersonOffset.clone().applyQuaternion(carMesh.quaternion).add(carMesh.position);
+      const lookTarget = this.firstPersonLookAhead.clone().applyQuaternion(carMesh.quaternion).add(carMesh.position);
+      this.camera.position.copy(eye);
+      this.camera.lookAt(lookTarget);
+      return;
+    }
+
     const back = new THREE.Vector3(0, 0, this.camOffset.z).applyQuaternion(carMesh.quaternion);
     const side = new THREE.Vector3(this.camOffset.x, 0, 0).applyQuaternion(carMesh.quaternion);
     const desired = carMesh.position.clone().add(back).add(side).add(new THREE.Vector3(0, this.camOffset.y, 0));
@@ -149,6 +168,14 @@ export class Game {
     this.camera.position.lerp(desired, 0.1);
     this.lookAt.copy(carMesh.position).add(new THREE.Vector3(0, 1.0, 0));
     this.camera.lookAt(this.lookAt);
+  }
+
+  toggleCameraMode() {
+    this.cameraMode = this.cameraMode === 'chase' ? 'first-person' : 'chase';
+    if (this.car && this.car.mesh) {
+      this.car.mesh.visible = this.cameraMode !== 'first-person';
+    }
+    console.info('[Camera:mode]', { mode: this.cameraMode });
   }
 
   updateHud(dt) {
@@ -160,7 +187,14 @@ export class Game {
     const { x, y, z } = this.car.body.velocity;
     const speedKmh = Math.max(0, Math.sqrt(x * x + z * z) * 3.6);
     this.hud.speed.textContent = speedKmh.toFixed(1).padStart(5, '0');
-    this.hud.gear.textContent = speedKmh < 5 ? 'N' : speedKmh < 70 ? '2' : speedKmh < 130 ? '3' : '4';
+    this.hud.gear.textContent = this.car.getGearLabel();
+    const engine = this.car.getEngineState();
+    this.hud.rev.textContent = String(engine.rpm).padStart(4, '0');
+    const lightsOn = Math.round(engine.normalized * this.hud.revLights.length);
+    for (let i = 0; i < this.hud.revLights.length; i += 1) {
+      this.hud.revLights[i].classList.toggle('on', i < lightsOn);
+    }
+    this.hud.shiftCue.classList.toggle('on', engine.shouldShiftUp);
 
     const vel = new THREE.Vector3(x, y, z);
     const g = vel.clone().sub(this.prevVel).divideScalar(Math.max(dt, 1e-3)).length() / 9.82;
@@ -178,7 +212,9 @@ export class Game {
     requestAnimationFrame(() => this.tick());
 
     const dt = Math.min(this.clock.getDelta(), 0.1);
-    const inputState = this.input.getState();
+    const keyboardState = this.input.getState();
+    const gamepadState = this.gamepadInput.getState();
+    const inputState = this.mergeInputState(keyboardState, gamepadState);
     this.car.updatePhysics(inputState, dt);
     this.world.step(1 / 60, dt, 4);
 
@@ -189,6 +225,35 @@ export class Game {
     this.logPeriodicTelemetry();
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  mergeInputState(keyboardState, gamepadState) {
+    const steerAxis = THREE.MathUtils.clamp(
+      gamepadState.steerAxis + (keyboardState.left ? 1 : 0) + (keyboardState.right ? -1 : 0),
+      -1,
+      1
+    );
+    const throttleAxis = THREE.MathUtils.clamp(
+      Math.max(gamepadState.throttleAxis, keyboardState.forward ? 1 : 0),
+      0,
+      1
+    );
+    const brakeAxis = THREE.MathUtils.clamp(
+      Math.max(gamepadState.brakeAxis, keyboardState.backward ? 1 : 0),
+      0,
+      1
+    );
+
+    return {
+      source: gamepadState.connected ? 'keyboard+gamepad' : 'keyboard',
+      forward: throttleAxis > 0.01,
+      backward: brakeAxis > 0.01,
+      left: steerAxis > 0.01,
+      right: steerAxis < -0.01,
+      steerAxis,
+      throttleAxis,
+      brakeAxis,
+    };
   }
 
   debugTick(dt, inputState) {

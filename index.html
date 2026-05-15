@@ -18,6 +18,14 @@
       .hud .row { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0; }
       .hud .big { font-size: 28px; color: var(--accent); font-weight: 700; }
       .hud .muted { opacity: 0.75; font-size: 12px; }
+      .rev-wrap { margin-top: 6px; }
+      .rev-lights { display: flex; gap: 4px; margin-top: 6px; }
+      .rev-light { width: 14px; height: 7px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.08); }
+      .rev-light.on.low { background: #38d87a; }
+      .rev-light.on.mid { background: #f3c844; }
+      .rev-light.on.high { background: #ff5f53; }
+      .shift-cue { margin-top: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #ff6b5d; opacity: 0; transition: opacity 0.12s linear; }
+      .shift-cue.on { opacity: 1; }
       .left { position: fixed; top: 12px; left: 12px; width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
       .minimap { width: 120px; height: 120px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; display: block; background: rgba(12, 17, 25, 0.82); }
       .footer { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
@@ -45,6 +53,16 @@
     <div class="hud">
       <div class="row"><span class="muted">SPEED</span><span id="speed" class="big">000</span></div>
       <div class="row"><span class="muted">GEAR</span><span id="gear" class="accent">N</span></div>
+      <div class="row rev-wrap"><span class="muted">REVS</span><span id="rev" class="accent">0900</span></div>
+      <div id="revLights" class="rev-lights">
+        <span class="rev-light low"></span>
+        <span class="rev-light low"></span>
+        <span class="rev-light mid"></span>
+        <span class="rev-light mid"></span>
+        <span class="rev-light high"></span>
+        <span class="rev-light high"></span>
+      </div>
+      <div id="shiftCue" class="shift-cue">SHIFT</div>
       <div class="row"><span class="muted">G-FORCE</span><span id="gforce">0.00g</span></div>
     </div>
 

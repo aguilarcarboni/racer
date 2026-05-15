@@ -8,6 +8,9 @@ const game = new Game({
   hud: {
     speed: document.getElementById('speed'),
     gear: document.getElementById('gear'),
+    rev: document.getElementById('rev'),
+    revLights: Array.from(document.querySelectorAll('#revLights .rev-light')),
+    shiftCue: document.getElementById('shiftCue'),
     gforce: document.getElementById('gforce'),
     lap: document.getElementById('lap'),
     mapDot: document.getElementById('mapDot'),
