@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Straight Track Physics Test</title>
+    <style>
+      :root {
+        --bg: #e6ebf0;
+        --panel: rgba(20, 24, 30, 0.82);
+        --line: rgba(255, 255, 255, 0.2);
+        --text: #f1f6fb;
+        --accent: #dce4ec;
+      }
+      html, body, #app { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+      body { background: var(--bg); color: var(--text); font-family: "Rajdhani", "Segoe UI", sans-serif; letter-spacing: 0.02em; }
+      .hud { position: fixed; top: 12px; right: 12px; width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(6px); }
+      .hud .row { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0; }
+      .hud .big { font-size: 28px; color: var(--accent); font-weight: 700; }
+      .hud .muted { opacity: 0.75; font-size: 12px; }
+      .left { position: fixed; top: 12px; left: 12px; width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+      .minimap { width: 120px; height: 120px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; display: block; background: rgba(12, 17, 25, 0.82); }
+      .footer { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
+      .accent { color: var(--accent); font-weight: 700; }
+      .tune { position: fixed; left: 12px; bottom: 12px; width: 260px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(6px); }
+      .tune .title { font-size: 12px; opacity: 0.8; margin-bottom: 6px; }
+      .tune .ctrl { margin: 8px 0; }
+      .tune .ctrl .row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
+      .tune input[type="range"] { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div class="left">
+      <div class="muted">LAP TIMER</div>
+      <div id="lap" class="big">0:00.000</div>
+      <div class="muted">TRACK: STRAIGHT_TEST_01</div>
+      <svg class="minimap" viewBox="0 0 100 100">
+        <line x1="50" y1="12" x2="50" y2="88" stroke="#c9d3dd" stroke-width="3" />
+        <circle id="mapDot" cx="50" cy="86" r="2.8" fill="#e7eef6" />
+      </svg>
+    </div>
+
+    <div class="hud">
+      <div class="row"><span class="muted">SPEED</span><span id="speed" class="big">000</span></div>
+      <div class="row"><span class="muted">GEAR</span><span id="gear" class="accent">N</span></div>
+      <div class="row"><span class="muted">G-FORCE</span><span id="gforce">0.00g</span></div>
+    </div>
+
+    <div class="footer">W/S throttle-brake | A/D steer | R reset</div>
+    <div class="tune">
+      <div class="title">SIMCADE TUNE</div>
+      <div class="ctrl">
+        <div class="row"><span>Brake Bias Front</span><span id="valBrakeBias">0.62</span></div>
+        <input id="tuneBrakeBias" type="range" min="0.45" max="0.80" step="0.01" value="0.62" />
+      </div>
+      <div class="ctrl">
+        <div class="row"><span>Weight Transfer Long</span><span id="valWtLong">0.25</span></div>
+        <input id="tuneWtLong" type="range" min="0.05" max="0.60" step="0.01" value="0.25" />
+      </div>
+      <div class="ctrl">
+        <div class="row"><span>Weight Transfer Lat</span><span id="valWtLat">0.30</span></div>
+        <input id="tuneWtLat" type="range" min="0.05" max="0.70" step="0.01" value="0.30" />
+      </div>
+      <div class="ctrl">
+        <div class="row"><span>Rear Grip Drop</span><span id="valRearDrop">0.18</span></div>
+        <input id="tuneRearDrop" type="range" min="0.00" max="0.45" step="0.01" value="0.18" />
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
