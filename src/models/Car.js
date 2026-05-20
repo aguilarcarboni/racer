@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export class Car {
   constructor(scene, world, material) {
@@ -80,43 +81,9 @@ export class Car {
   }
 
   create() {
-    const carGroup = new THREE.Group();
-
-    const chassis = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 0.5, 3.2),
-      new THREE.MeshStandardMaterial({ color: 0x1e5eff, roughness: 0.35, metalness: 0.2 })
-    );
-    chassis.position.y = 0.45;
-    chassis.castShadow = true;
-    chassis.receiveShadow = true;
-    carGroup.add(chassis);
-
-    const cabin = new THREE.Mesh(
-      new THREE.BoxGeometry(1.25, 0.45, 1.4),
-      new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.25, metalness: 0.05 })
-    );
-    cabin.position.set(0, 0.83, -0.15);
-    cabin.castShadow = true;
-    carGroup.add(cabin);
-
-    const wheelGeo = new THREE.CylinderGeometry(0.34, 0.34, 0.27, 18);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x17191d, roughness: 0.9, metalness: 0 });
-    const wheelOffsets = [
-      [0.92, 0.34, 1.08],
-      [-0.92, 0.34, 1.08],
-      [0.92, 0.34, -1.08],
-      [-0.92, 0.34, -1.08],
-    ];
-    for (const [x, y, z] of wheelOffsets) {
-      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, y, z);
-      wheel.castShadow = true;
-      carGroup.add(wheel);
-    }
-
-    this.mesh = carGroup;
+    this.mesh = new THREE.Group();
     this.scene.add(this.mesh);
+    this.loadVisualModel();
 
     const shape = new CANNON.Box(new CANNON.Vec3(0.85, 0.3, 1.55));
     this.body = new CANNON.Body({
@@ -136,6 +103,47 @@ export class Car {
     });
 
     this.syncVisuals();
+  }
+
+  loadVisualModel() {
+    const loader = new GLTFLoader();
+    loader.load(
+      '/models/raceCarRed.glb',
+      (gltf) => {
+        const model = gltf.scene || gltf.scenes?.[0];
+        if (!model) {
+          console.error('[Car:model-load-failed]', { model: '/models/raceCarRed.glb', reason: 'missing scene' });
+          return;
+        }
+
+        model.traverse((node) => {
+          if (node.isMesh) {
+            node.castShadow = true;
+            node.receiveShadow = true;
+          }
+        });
+
+        const box = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const sourceLength = Math.max(size.z, size.x, 1e-3);
+        const targetLength = 3.2;
+        const uniformScale = targetLength / sourceLength;
+        model.scale.setScalar(uniformScale);
+
+        box.setFromObject(model);
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        model.position.set(-center.x, -box.min.y, -center.z);
+
+        this.mesh.clear();
+        this.mesh.add(model);
+      },
+      undefined,
+      (error) => {
+        console.error('[Car:model-load-failed]', { model: '/models/raceCarRed.glb', error });
+      }
+    );
   }
 
   updatePhysics(input, dt) {

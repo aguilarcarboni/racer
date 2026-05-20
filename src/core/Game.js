@@ -30,6 +30,7 @@ export class Game {
     this.cameraMode = 'chase';
     this.prevVel = new THREE.Vector3();
     this.lapTime = 0;
+    this.lapCount = 0;
     this.frameCount = 0;
     this.lastDebugLogAt = 0;
     this.debugLogIntervalMs = 200;
@@ -53,6 +54,8 @@ export class Game {
     this.setupTuningUi();
     this.input.onReset = () => this.reset();
     this.input.onToggleCamera = () => this.toggleCameraMode();
+    this.input.onShiftUp = () => this.car?.shiftUp();
+    this.input.onShiftDown = () => this.car?.shiftDown();
     this.input.onTelemetry = (payload) => this.logInputTelemetry(payload);
     this.gamepadInput.onReset = () => this.reset();
     this.gamepadInput.onToggleCamera = () => this.toggleCameraMode();
@@ -111,7 +114,22 @@ export class Game {
     this.track.create();
 
     this.car = new Car(this.scene, this.world, carMaterial);
+    const spawn = this.track.getSpawnPoint(this.car.startPosition.y);
+    console.info('[Track:spawn-target]', spawn);
+    this.car.startPosition.set(spawn.x, spawn.y, spawn.z);
     this.car.create();
+    console.info('[Car:spawn-applied]', {
+      startPosition: {
+        x: this.car.startPosition.x,
+        y: this.car.startPosition.y,
+        z: this.car.startPosition.z,
+      },
+      bodyPosition: {
+        x: this.car.body.position.x,
+        y: this.car.body.position.y,
+        z: this.car.body.position.z,
+      },
+    });
     console.info('[Game:world] Car and track created', {
       gravity: this.world.gravity,
       trackLength: this.track.length,
@@ -123,6 +141,8 @@ export class Game {
   reset() {
     this.car.reset();
     this.lapTime = 0;
+    this.lapCount = 0;
+    this.hud.laps.textContent = String(this.lapCount);
     console.warn('[Game:reset] Car reset requested');
   }
 
@@ -183,6 +203,7 @@ export class Game {
     const mins = Math.floor(this.lapTime / 60);
     const secs = (this.lapTime % 60).toFixed(3).padStart(6, '0');
     this.hud.lap.textContent = `${mins}:${secs}`;
+    this.hud.laps.textContent = String(this.lapCount);
 
     const { x, y, z } = this.car.body.velocity;
     const speedKmh = Math.max(0, Math.sqrt(x * x + z * z) * 3.6);
@@ -203,9 +224,6 @@ export class Game {
 
     const trackPos = { x: this.car.body.position.x, z: this.car.body.position.z };
     this.track.getNormalizedProgress(trackPos);
-    const mapDot = this.track.getMapDot(trackPos);
-    this.hud.mapDot.setAttribute('cx', String(mapDot.cx));
-    this.hud.mapDot.setAttribute('cy', String(mapDot.cy));
   }
 
   tick() {

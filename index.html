@@ -27,7 +27,6 @@
       .shift-cue { margin-top: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #ff6b5d; opacity: 0; transition: opacity 0.12s linear; }
       .shift-cue.on { opacity: 1; }
       .left { position: fixed; top: 12px; left: 12px; width: 220px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
-      .minimap { width: 120px; height: 120px; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; display: block; background: rgba(12, 17, 25, 0.82); }
       .footer { position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
       .accent { color: var(--accent); font-weight: 700; }
       .tune { position: fixed; left: 12px; bottom: 12px; width: 260px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(6px); }
@@ -43,11 +42,7 @@
     <div class="left">
       <div class="muted">LAP TIMER</div>
       <div id="lap" class="big">0:00.000</div>
-      <div class="muted">TRACK: STRAIGHT_TEST_01</div>
-      <svg class="minimap" viewBox="0 0 100 100">
-        <line x1="50" y1="12" x2="50" y2="88" stroke="#c9d3dd" stroke-width="3" />
-        <circle id="mapDot" cx="50" cy="86" r="2.8" fill="#e7eef6" />
-      </svg>
+      <div class="row"><span class="muted">LAPS</span><span id="laps" class="accent">0</span></div>
     </div>
 
     <div class="hud">

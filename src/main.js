@@ -13,7 +13,7 @@ const game = new Game({
     shiftCue: document.getElementById('shiftCue'),
     gforce: document.getElementById('gforce'),
     lap: document.getElementById('lap'),
-    mapDot: document.getElementById('mapDot'),
+    laps: document.getElementById('laps'),
     tune: {
       brakeBias: document.getElementById('tuneBrakeBias'),
       wtLong: document.getElementById('tuneWtLong'),
