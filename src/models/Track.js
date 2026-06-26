@@ -46,101 +46,64 @@ export class Track {
   buildStarterGrid() {
     this.gridTiles.clear();
 
+    const straightTilesPerSide = 6;
+    const farEdge = straightTilesPerSide + 1;
+
     this.setGridTile(0, 0, {
       type: 'corner',
       modelPath: '/models/roadCornerSmall.glb',
       yaw: Math.PI / 2,
     });
 
-    this.setGridTile(0, 1, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
+    for (let gridY = 1; gridY < farEdge; gridY += 1) {
+      this.setGridTile(0, gridY, {
+        type: 'straight',
+        modelPath: '/models/roadStraight.glb',
+        yaw: 0,
+      });
+    }
 
-    this.setGridTile(0, 2, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
-
-    this.setGridTile(0, 3, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
-
-    this.setGridTile(0, 4, {
+    this.setGridTile(0, farEdge, {
       type: 'corner',
       modelPath: '/models/roadCornerSmall.glb',
       yaw: 0,
     });
 
-    this.setGridTile(-1, 4, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
+    for (let gridX = -1; gridX > -farEdge; gridX -= 1) {
+      this.setGridTile(gridX, farEdge, {
+        type: 'straight',
+        modelPath: '/models/roadStraight.glb',
+        yaw: Math.PI / 2,
+      });
+    }
 
-    this.setGridTile(-2, 4, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
-
-    this.setGridTile(-3, 4, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
-
-    this.setGridTile(-4, 4, {
+    this.setGridTile(-farEdge, farEdge, {
       type: 'corner',
       modelPath: '/models/roadCornerSmall.glb',
       yaw: (3 * Math.PI) / 2,
     });
 
-    this.setGridTile(-4, 3, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
+    for (let gridY = farEdge - 1; gridY > 0; gridY -= 1) {
+      this.setGridTile(-farEdge, gridY, {
+        type: 'straight',
+        modelPath: '/models/roadStraight.glb',
+        yaw: 0,
+      });
+    }
 
-    this.setGridTile(-4, 2, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
-
-    this.setGridTile(-4, 1, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: 0,
-    });
-
-    this.setGridTile(-4, 0, {
+    this.setGridTile(-farEdge, 0, {
       type: 'corner',
       modelPath: '/models/roadCornerSmall.glb',
       yaw: Math.PI,
     });
 
-    this.setGridTile(-1, 0, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
-
-    this.setGridTile(-2, 0, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
-
-    this.setGridTile(-3, 0, {
-      type: 'straight',
-      modelPath: '/models/roadStraight.glb',
-      yaw: Math.PI / 2,
-    });
+    for (let gridX = -farEdge + 1; gridX < 0; gridX += 1) {
+      this.setGridTile(gridX, 0, {
+        type: 'straight',
+        modelPath: '/models/roadStraight.glb',
+        yaw: Math.PI / 2,
+      });
+    }
   }
 
   setGridTile(gridX, gridY, tile) {
