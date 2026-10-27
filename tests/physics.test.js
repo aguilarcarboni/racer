@@ -63,10 +63,12 @@ test("suspension settles on four wheels above the road", () => {
   assert.ok(r.body.position.y > 0.5 && r.body.position.y < 0.75);
   assert.ok(Math.abs(r.body.velocity.y) < 0.03);
 });
-test("keyboard steering uses the requested reversal while controller polarity is retained", () => {
+test("keyboard and controller steering both use the requested reversal", () => {
   assert.equal(mergeInputState({ right: true }, {}).steerAxis, -1);
-  assert.equal(mergeInputState({}, { steerAxis: 0.7 }).steerAxis, 0.7);
+  assert.equal(mergeInputState({}, { steerAxis: 0.7 }).steerAxis, -0.7);
   assert.equal(mergeInputState({ left: true }, {}).steerAxis, 1);
+  assert.equal(mergeInputState({}, { steerAxis: -0.7 }).steerAxis, 0.7);
+  assert.equal(mergeInputState({ right: true }, { steerAxis: 0.7 }).steerAxis, -1);
 });
 test("right steering produces a right turn, left produces a left turn", () => {
   const a = rig(),

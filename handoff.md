@@ -31,3 +31,7 @@ The next action is the user's first drive. Follow the repository's fast playtest
 ## A/D playtest correction
 
 The user reported inverted keyboard steering and explicitly requested swapping A and D. Reversed only the keyboard steering contributions in InputState; retained the controller axis mapping. Updated the existing mapping assertions. Validate with npm test and npm run build, then obtain the next user playtest feedback before further handling edits.
+
+## Controller playtest correction
+
+The user also reported inverted controller steering. Reversed the controller axis contribution at the shared InputState boundary to match the accepted keyboard reversal. Updated the existing mapping assertions for both stick directions and simultaneous keyboard/controller input. No tire or suspension parameters changed.
