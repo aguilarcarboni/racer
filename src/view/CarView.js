@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { WheelRig } from "./WheelRig.js";
 import { carUrl } from "./Assets.js";
 const carAsset = new GLTFLoader();
 let carTemplate;
@@ -7,8 +8,7 @@ export class CarView {
   constructor(scene, { color = "#dd542f", id = "you" } = {}) {
     this.root = new THREE.Group();
     scene.add(this.root);
-    this.wheels = [];
-    this.spin = 0;
+    this.wheelRig = null;
     this.root.add(
       new THREE.Mesh(
         new THREE.BoxGeometry(1.5, 0.45, 3.5),
@@ -37,20 +37,14 @@ export class CarView {
               n.material.metalness = 0.12;
             }
           }
-          if (n.name?.startsWith("wheel"))
-            this.wheels.push({
-              node: n,
-              position: n.position.clone(),
-              rotation: n.rotation.clone(),
-              front: n.name.includes("Front"),
-            });
         });
+        this.wheelRig = new WheelRig(model, this.scale);
         this.root.clear();
         this.root.add(model);
         console.info("[Car:model-ready]", {
           url: carUrl,
           id,
-          wheels: this.wheels.length,
+          wheels: this.wheelRig.wheels.length,
           length: 3.8,
         });
       },
@@ -68,23 +62,6 @@ export class CarView {
     );
     this.root.quaternion.copy(body.quaternion);
     const forward = body.vectorToLocalFrame(body.velocity);
-    this.spin += (forward.z * dt) / 0.32;
-    this.wheels.forEach((w, i) => {
-      w.node.rotation.copy(w.rotation);
-      w.node.rotation.x += this.spin;
-      if (w.front) w.node.rotation.y += steer;
-      const info =
-        vehicle.wheelInfos[
-          w.front
-            ? w.node.name.includes("Left")
-              ? 1
-              : 0
-            : w.node.name.includes("Left")
-              ? 3
-              : 2
-        ];
-      w.node.position.y =
-        w.position.y + (0.223 - info.suspensionLength) / (this.scale || 1);
-    });
+    this.wheelRig?.sync(vehicle, steer, forward.z, dt);
   }
 }

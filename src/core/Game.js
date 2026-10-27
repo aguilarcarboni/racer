@@ -9,6 +9,7 @@ import { GamepadController } from "./GamepadController.js";
 import { mergeInputState } from "./InputState.js";
 import { Telemetry } from "./Telemetry.js";
 import { VEHICLE } from "../physics/VehicleConfig.js";
+import { HoodCamera } from "../view/HoodCamera.js";
 import { Hud } from "../ui/Hud.js";
 export class Game {
   constructor({ container }) {
@@ -41,6 +42,7 @@ export class Game {
     this.simTime = 0;
     this.paused = false;
     this.cameraMode = 0;
+    this.hoodCamera = new HoodCamera();
     this.cameraReady = false;
   }
   init() {
@@ -151,12 +153,9 @@ export class Game {
       desired = new THREE.Vector3(305, 280, -325);
       look = new THREE.Vector3(85, 0, -35);
     } else if (this.cameraMode === 1) {
-      desired = position
-        .clone()
-        .add(new THREE.Vector3(0, 0.8, 0.5).applyQuaternion(q));
-      look = position
-        .clone()
-        .add(new THREE.Vector3(0, 0.8, 30).applyQuaternion(q));
+      this.hoodCamera.update(this.camera, pose, dt, !this.cameraReady);
+      this.cameraReady = true;
+      return;
     } else {
       const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
       forward.y = 0;
@@ -227,6 +226,7 @@ export class Game {
       this.track.getNormalizedProgress(state.position),
       race,
       advice,
+      this.cameraMode === 1 ? this.hoodCamera.getState() : undefined,
     );
     this.renderer.render(this.scene, this.camera);
   }

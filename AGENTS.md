@@ -27,6 +27,8 @@ Goals:
 - `src/racing/`: race session, physical field, AI controls and curvature/braking speed profile.
 - `src/view/RacingLineView.js`: reactive arrow colors from actual speed versus the profile.
 - `src/view/`: car, build-safe existing assets, environment and lighting.
+- `src/view/WheelRig.js`: original-asset hub pivots, steering/spin hierarchy and suspension travel.
+- `src/view/HoodCamera.js`: damped first-person heave/pitch with immediate heading response.
 - `src/ui/Hud.js`: instruments, minimap, setup bindings and lap display.
 - `index.html`, `src/style.css`: visual presentation and accessible controls.
 - `tests/`: behavior tests including a full conservative drive on the actual circuit.
@@ -257,3 +259,5 @@ The handling target is believable arcade racing with forgiving grip and physical
 ## Club racing
 
 Opponents use the same Car and VehicleDynamics API as the player. AI steering uses the physical axis directly; preserve the user-approved keyboard/controller inversion only at InputState. RaceField computes controls before the world step and lap/classification state after it. RaceSession and RacingLineProfile remain independent of rendering. Guide colors reflect actual speed; do not turn them green simply because brake input is held. The lower-power/stronger-front player tune remains the accepted handling baseline.
+
+For wheel animation, keep steering above spin in the transform hierarchy and rotate around the actual hub center. Test against the original GLB, including full steering lock and rolling. Keep first-person camera stabilization separate from physical suspension; preserve road bumps in the chassis. Hood camera diagnostics are included in periodic telemetry while that view is active.

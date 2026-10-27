@@ -70,7 +70,9 @@ The lap timer starts at the gantry. Ordered quarter-lap checkpoints prevent a sh
 - `src/racing/AiDriver.js`: path following, speed preview and traffic decisions.
 - `src/racing/RacingLineProfile.js`: closed-circuit corner speed and braking envelope.
 - `src/view/RacingLineView.js`: speed-reactive road chevrons.
-- `src/view/CarView.js`: existing car asset, wheel steering/rotation/travel.
+- `src/view/CarView.js`: existing car asset and chassis pose.
+- `src/view/WheelRig.js`: hub-centered wheel steering/rotation/travel.
+- `src/view/HoodCamera.js`: stabilized first-person view with damped heave/pitch.
 - `src/view/Environment.js`: lighting, grass, instanced trees and distant hills.
 - `src/view/Assets.js`: build-safe references to the repository's existing models.
 - `src/ui/Hud.js`: instruments, minimap, lap display and setup.

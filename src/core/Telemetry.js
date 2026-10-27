@@ -15,7 +15,7 @@ export class Telemetry {
       }),
     );
   }
-  update(time, state, progress, race, advice) {
+  update(time, state, progress, race, advice, hoodCamera) {
     if (time - this.last < 1.5) return;
     this.last = time;
     console.info(
@@ -30,6 +30,7 @@ export class Telemetry {
           .map((e) => ({ id: e.id, distance: +e.distance.toFixed(3) })),
         lineStatus: advice?.level,
         lineTargetKmh: advice ? Math.round(advice.targetSpeed * 3.6) : null,
+        hoodCamera,
         gear: state.gear,
         steer: +state.steer.toFixed(3),
         driveForce: +state.driveForce.toFixed(0),
