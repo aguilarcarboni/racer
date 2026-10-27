@@ -4,10 +4,11 @@ import { VehicleDynamics } from "../physics/VehicleDynamics.js";
 import { createChassis, applyDrive } from "../physics/Chassis.js";
 import { CarView } from "../view/CarView.js";
 export class Car {
-  constructor(scene, world, material) {
+  constructor(scene, world, material, appearance = {}) {
     this.scene = scene;
     this.world = world;
     this.material = material;
+    this.appearance = appearance;
     this.dynamics = new VehicleDynamics();
     this.startPosition = new CANNON.Vec3();
     this.spawnYaw = 0;
@@ -20,7 +21,7 @@ export class Car {
     const chassis = createChassis(this.world, this.material, spawn);
     this.body = chassis.body;
     this.vehicle = chassis.vehicle;
-    this.view = new CarView(this.scene);
+    this.view = new CarView(this.scene, this.appearance);
     this.mesh = this.view.root;
     this.body.addEventListener("collide", () => {
       this.contacts++;

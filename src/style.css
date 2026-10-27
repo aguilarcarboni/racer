@@ -881,3 +881,144 @@ h2 {
     transition: none !important;
   }
 }
+
+.race-panel {
+  position: absolute;
+  top: 275px;
+  left: 38px;
+  width: 270px;
+  background: rgba(27, 45, 39, 0.86);
+  backdrop-filter: blur(14px);
+  padding: 18px 20px;
+  border-radius: 4px;
+  box-shadow:
+    0 8px 30px #162e2920,
+    0 0 0 1px #ffffff12;
+}
+.race-panel[hidden] {
+  display: none;
+}
+.race-position {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.race-position > span,
+.standings-title {
+  font-size: 7px;
+  letter-spacing: 1.3px;
+  color: #b9cbb9;
+}
+.race-position strong {
+  font:
+    500 32px "Barlow Condensed",
+    sans-serif;
+  color: #efd0a2;
+}
+.standings-title {
+  margin: 15px 0 10px;
+  font-size: 6px;
+}
+#standings-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.standing-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 9px;
+  min-height: 27px;
+  color: #d2ddce;
+}
+.standing-rank {
+  font-size: 8px;
+  color: #a1b5a5;
+  width: 12px;
+}
+.standing-row > i {
+  width: 3px;
+  height: 12px;
+  border-radius: 1px;
+}
+.standing-row strong {
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+.standing-row small {
+  margin-left: auto;
+  font-size: 6px;
+  color: #9ab2a4;
+}
+.standing-row.you {
+  color: #f4d4a9;
+}
+.line-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  font-size: 5px;
+  letter-spacing: 0.5px;
+  border-top: 1px solid #ffffff15;
+  padding-top: 14px;
+  margin-top: 12px;
+  color: #afc4b1;
+}
+.line-legend i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: block;
+}
+.line-legend .green {
+  background: #5ce78a;
+}
+.line-legend .amber {
+  background: #ffd45b;
+}
+.line-legend .red {
+  background: #ff4c32;
+}
+#corner-cue[data-line="brake"] {
+  color: #ff9877;
+}
+#corner-cue[data-line="caution"] {
+  color: #ffd685;
+}
+@media (min-width: 1600px) {
+  .race-panel {
+    left: 48px;
+  }
+}
+@media (max-width: 1000px) {
+  .race-panel {
+    left: 22px;
+    top: 250px;
+    width: 225px;
+    padding: 15px;
+  }
+}
+@media (max-width: 700px) {
+  .race-panel {
+    top: 240px;
+    width: 168px;
+    padding: 12px;
+  }
+  .race-position strong {
+    font-size: 27px;
+  }
+  .standing-row {
+    min-height: 24px;
+  }
+  .line-legend {
+    font-size: 4px;
+    gap: 3px;
+  }
+}
+@media (max-height: 740px) and (min-width: 701px) {
+  .race-panel {
+    top: 260px;
+  }
+}

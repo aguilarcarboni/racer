@@ -26,7 +26,7 @@ Root causes addressed: reversed input merge; throttle excluding brake logic; fro
 
 W/S throttle, brake and reverse; A/D steering; Space handbrake; C chase/hood/circuit camera; G auto/manual; Up/Down manual shift; L guide; R reset; Escape pause. Open Car setup for the existing tuning controls plus suspension firmness.
 
-The next action is the user's first drive. Follow the repository's fast playtest loop: collect their handling/bump/camera feedback before making another physics or gameplay iteration. Keep this as an arcade-friendly prototype rather than claiming a calibrated real-car simulator. Controller hardware, force-feedback wheels, mobile controls and human full-lap acceptance remain unverified. There are no opponents, races, networking, vehicle damage or tire wear yet.
+The next action is the user's first drive. Follow the repository's fast playtest loop: collect their handling/bump/camera feedback before making another physics or gameplay iteration. Keep this as an arcade-friendly prototype rather than claiming a calibrated real-car simulator. Controller hardware, force-feedback wheels, mobile controls and human full-lap acceptance remain unverified. The original pass had no opponents or races; the club-race addition below supersedes that. Networking, vehicle damage and tire wear remain absent.
 
 ## A/D playtest correction
 
@@ -41,3 +41,15 @@ The user also reported inverted controller steering. Reversed the controller axi
 Requested less horsepower and more front grip. Engine power cap reduced from 210 to 140 kW, peak drive force from 8,600 to 4,800 N, front cornering stiffness from 68,000 to 74,000 N/rad, and a front-only grip multiplier defaults to 1.15. Front tire grip is exposed in Car setup with model-boundary clamping and diagnostics. The existing acceleration/braking checks now allow the slower warm-up; full-circuit and stability checks remain. Earlier acceleration measurements above describe the previous tune. Await user feedback before further handling changes.
 
 Matched-input headless check: five-second acceleration decreased from 92.95 to 69.23 km/h. At a fixed 72 km/h and full steering, modeled front lateral force increased from 3,942 to 4,339 N. All 19 tests and the build pass. These are simulation comparisons; acceptance of the new feel awaits the user.
+
+## Three-opponent club race and reactive line
+
+Added three physical opponents (SOL, RIO, NOVA), a staggered grid, throttle-triggered three-second countdown, three-lap finish classification, live standings and colored minimap dots. R resets the whole field and keeps the player's best lap. Opponents reuse Car, VehicleDynamics and the same suspension/terrain; physical steering bypasses only the human input inversion. The accepted 140 kW/front-grip tune is unchanged.
+
+RaceField owns grid/control/per-car lap coordination. RaceSession owns countdown, distance and finish ordering. AiDriver uses previewed corner speeds, pure pursuit, traffic in circuit coordinates, committed passing lanes with clearance and a reverse recovery. The existing GLB is loaded once and cloned/recolored for the field. The renderer remains separate from control rules.
+
+Replaced the fixed guide with chevrons colored by actual speed relative to a curvature limit and a backward braking envelope. Each road section gets its own color, so upcoming corners can be red while the straight remains green. Slowing down changes colors; brake input alone does not. L toggles the guide. This follows the road center rather than solving an optimal racing trajectory, and the recommendation is approximate rather than a guarantee of available grip.
+
+Validation: 31 behavior tests, including the fastest AI driving the physical bumpy circuit and a four-body field with a stopped player: all three opponents pass it and complete at least three laps within 270 simulated seconds, with their centers remaining on the 12 m asphalt. Race countdown, classification across the timing seam, three-lap finishes, reset, braking-envelope continuity and actual-speed color changes are covered. Production build passes; the existing bundle-size advisory remains. Browser evidence shows all four car models loading, countdown/start, standings and moving minimap positions. Periodic logs report red at 116.9 km/h against a 110 km/h recommendation, amber at 91.6 against 91, and green after slowing. This is local validation, not human acceptance of the full race.
+
+AI remains a prototype: contact and aggressive blocking can upset a car, and reverse recovery is basic. No rubber-banding, teleporting or network racing. Next step is the user's race playtest before any further gameplay/handling changes.

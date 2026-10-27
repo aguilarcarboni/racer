@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. No menu blocks the first drive.
+Open http://127.0.0.1:5173. Press throttle to begin a three-second countdown, then race three opponents over three laps.
 
 | Control   | Action                                                                |
 | --------- | --------------------------------------------------------------------- |
@@ -21,11 +21,11 @@ Open http://127.0.0.1:5173. No menu blocks the first drive.
 | C         | Chase, hood, circuit overview                                         |
 | G         | Automatic / manual gearbox                                            |
 | Up / Down | Manual shift; selecting a gear switches to manual                     |
-| L         | Toggle centerline guide                                               |
-| R         | Reset to the opening straight; retain the session best lap            |
+| L         | Toggle reactive racing line                                           |
+| R         | Restart the race; retain the session best lap                         |
 | Escape    | Pause / resume                                                        |
 
-Automatic gears are on initially. The guide is a centerline aid, not an optimized braking/racing line. Slow down before corners. Grass and gravel have lower grip and greater rolling resistance. Open Car setup to adjust brake bias, pitch response, cornering load, rear rotation, front tire grip and suspension firmness. The original four tuning settings remain available.
+Automatic gears are on initially. The arrow guide follows the center of the road. Its color compares your actual speed with a curvature-based cornering and braking envelope: green means comfortable, amber means ease off, red means brake. Slowing down turns it green again. Each section previews its own speed requirement, so a corner can be red while the straight remains green. It is a driving aid rather than a fully optimized racing trajectory. Grass and gravel have lower grip and greater rolling resistance. Open Car setup to adjust brake bias, pitch response, cornering load, rear rotation, front tire grip and suspension firmness. The original four tuning settings remain available.
 
 A standard gamepad uses the left stick to steer, triggers to accelerate/brake, the top face button for camera, the left face button for handbrake, and bottom/right face buttons for shifting. Hardware controller acceptance is still pending.
 
@@ -42,11 +42,13 @@ The goal is approachable, believable arcade handling: progressive grip, useful b
 - Surface grip and drag change off the asphalt. Contact is required for tire traction, so throttle cannot steer or accelerate an airborne chassis through tire force.
 - Fixed 120 Hz physics; rendering follows model state. A hidden tab pauses. Long frame stalls are capped to avoid runaway catch-up, which can slow simulation under heavy load.
 
-This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model, multiplayer, opponents or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
+This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model, multiplayer or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
 
-## Time attack
+## Club race
 
-The timer starts at the gantry. Ordered quarter-lap checkpoints prevent a shortcut across the start line from counting as a lap. Going well outside the road invalidates the current lap. Best/last times and lap count are session-only. Reset restarts the out lap while keeping the current session best.
+Three differently colored opponents use the same car physics, suspension, surface grip and collisions as you. They steer, brake, follow traffic and seek passing room; they have no teleport or catch-up speed bonus. Live standings and minimap dots track the field. Throttle starts the countdown; R restarts the field. The race ends after three completed laps.
+
+The lap timer starts at the gantry. Ordered quarter-lap checkpoints prevent a shortcut across the start line from counting as a lap. Going well outside the road invalidates the current lap. Best/last times and lap count are session-only. Reset restarts the out lap while keeping the current session best.
 
 ## Code map
 
@@ -63,6 +65,11 @@ The timer starts at the gantry. Ordered quarter-lap checkpoints prevent a shortc
 - `src/models/TrackLayout.js`: closed spline, sampling, nearest path and surface classification.
 - `src/models/Track.js`: road meshes, physical curbs/barriers, spawn and circuit scenery.
 - `src/models/LapTracker.js`: ordered lap gates, validity and best time.
+- `src/racing/RaceField.js`: physical grid, opponent controls and per-car lap tracking.
+- `src/racing/RaceSession.js`: countdown, race distance, standings and finish order.
+- `src/racing/AiDriver.js`: path following, speed preview and traffic decisions.
+- `src/racing/RacingLineProfile.js`: closed-circuit corner speed and braking envelope.
+- `src/view/RacingLineView.js`: speed-reactive road chevrons.
 - `src/view/CarView.js`: existing car asset, wheel steering/rotation/travel.
 - `src/view/Environment.js`: lighting, grass, instanced trees and distant hills.
 - `src/view/Assets.js`: build-safe references to the repository's existing models.
@@ -72,7 +79,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 19 behavior tests, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

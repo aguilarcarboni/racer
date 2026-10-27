@@ -10,6 +10,27 @@ export class Hud {
     this.drawMap();
     $("track-length").textContent = (track.length / 1000).toFixed(2);
   }
+  bindRace(race) {
+    const body = $("standings-body"),
+      dots = $("map-opponents");
+    for (const entry of race.entries) {
+      const row = document.createElement("div");
+      row.className = "standing-row";
+      row.id = `standing-${entry.id}`;
+      row.innerHTML = `<span class="standing-rank">${entry.rank}</span><i style="background:${entry.color}"></i><strong>${entry.name}</strong><small>${entry.isPlayer ? "YOU" : "AI"}</small>`;
+      body.append(row);
+      if (!entry.isPlayer) {
+        const dot = document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "circle",
+        );
+        dot.setAttribute("r", "3");
+        dot.setAttribute("fill", entry.color);
+        dot.id = `map-${entry.id}`;
+        dots.append(dot);
+      }
+    }
+  }
   bindTuning(car) {
     const controls = [
       ["tuneBrakeBias", "valBrakeBias", "brakeBiasFront"],
@@ -54,7 +75,7 @@ export class Hud {
     $("map-start").setAttribute("cx", p[0]);
     $("map-start").setAttribute("cy", p[1]);
   }
-  update(state, lap, input, dt, paused, camera) {
+  update(state, lap, input, dt, paused, camera, race, advice) {
     const speed = Math.round(state.speedMps * 3.6);
     $("speed").textContent = String(speed).padStart(3, "0");
     $("gear").textContent =
@@ -70,7 +91,8 @@ export class Hud {
     $("throttle-fill").style.height = `${input.throttleAxis * 100}%`;
     $("brake-fill").style.height = `${input.brakeAxis * 100}%`;
     $("lap").textContent = formatTime(lap.elapsed);
-    $("laps").textContent = String(lap.laps + 1).padStart(2, "0");
+    $("laps").textContent =
+      `${Math.min(race.laps, lap.laps + 1)} / ${race.laps}`;
     $("best").textContent = formatTime(lap.best);
     $("last-lap").textContent = lap.last
       ? formatTime(lap.last.time)
@@ -81,7 +103,7 @@ export class Hud {
         ? "LAP INVALID"
         : lap.wrongWay
           ? "WRONG WAY"
-          : "TIME ATTACK";
+          : "CLUB RACE";
     $("lap-status").classList.toggle("invalid", !lap.valid || lap.wrongWay);
     $("surface").textContent = state.surface.toUpperCase();
     $("surface").classList.toggle(
@@ -96,7 +118,23 @@ export class Hud {
     $("gforce").textContent = `${g.toFixed(2)} G`;
     $("pause-screen").hidden = !paused;
     $("camera-label").textContent = ["CHASE", "HOOD", "CIRCUIT"][camera];
-    $("intro").classList.toggle("driving", speed > 6 || lap.started);
+    $("intro").classList.toggle("driving", race.phase !== "ready");
+    $("race-panel").hidden = race.phase === "ready";
+    $("race-position").textContent = `${race.position} / ${race.total}`;
+    $("race-state").textContent =
+      race.phase === "finished" ? "FINISHED" : "LIVE STANDINGS";
+    for (const entry of race.entries) {
+      const row = $(`standing-${entry.id}`);
+      row.style.order = entry.rank;
+      row.querySelector(".standing-rank").textContent = entry.rank;
+      row.classList.toggle("you", entry.isPlayer);
+      if (!entry.isPlayer) {
+        const point = this.project(entry.position);
+        const dot = $(`map-${entry.id}`);
+        dot.setAttribute("cx", point[0]);
+        dot.setAttribute("cy", point[1]);
+      }
+    }
     const p = this.project(state.position);
     $("map-car").setAttribute("transform", `translate(${p[0]},${p[1]})`);
     const near = this.track.nearest(state.position);
@@ -112,6 +150,16 @@ export class Hud {
       : Math.abs(turn) > 0.22
         ? (turn < 0 ? "RIGHT" : "LEFT") + " AHEAD / BRAKE EARLY"
         : "Find your rhythm. Follow the line.";
+    const cue = $("corner-cue");
+    if (race.phase === "ready")
+      cue.textContent = "Throttle to start / 3 lap race";
+    else if (race.phase === "countdown")
+      cue.textContent = `LIGHTS OUT IN ${race.countdown}`;
+    else if (race.phase === "finished")
+      cue.textContent = `P${race.position} / FINISHED. R to race again.`;
+    else if (!lap.wrongWay && advice.level !== "safe")
+      cue.textContent = `${advice.level === "brake" ? "BRAKE" : "EASE OFF"} / ${Math.round(advice.targetSpeed * 3.6)} KM/H`;
+    cue.dataset.line = advice.level;
     $("speed-ring").style.setProperty(
       "--rpm",
       `${state.engine.normalized * 100}%`,

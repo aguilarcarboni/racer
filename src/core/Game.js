@@ -1,3 +1,4 @@
+import { RaceField } from "../racing/RaceField.js";
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { Track } from "../models/Track.js";
@@ -55,8 +56,17 @@ export class Game {
     this.track = new Track(this.scene);
     this.track.create(this.world, ground);
     this.car = new Car(this.scene, this.world, carMat);
-    this.car.create(this.track.getSpawnPoint());
+    this.car.create(this.track.getGridSpawn(2));
+    this.race = new RaceField({
+      scene: this.scene,
+      world: this.world,
+      material: carMat,
+      track: this.track,
+      player: this.car,
+      playerLaps: this.laps,
+    });
     this.hud = new Hud(this.track);
+    this.hud.bindRace(this.race.getSnapshot());
     this.setupTuningUi();
     for (const source of [this.input, this.gamepad]) {
       source.onReset = () => this.reset();
@@ -106,8 +116,7 @@ export class Game {
     this.hud.bindTuning(this.car);
   }
   reset() {
-    this.car.reset();
-    this.laps.reset();
+    this.race.reset();
     this.cameraReady = false;
     console.info("[Game:reset]", { spawn: this.car.getPosition() });
   }
@@ -184,23 +193,23 @@ export class Game {
     if (!this.paused) {
       this.accumulator += dt;
       while (this.accumulator >= VEHICLE.fixedStep) {
-        const p = this.car.getPosition();
-        this.car.updatePhysics(
-          input,
-          VEHICLE.fixedStep,
-          this.track.getSurface(p),
-          this.track.terrain.getHeight(p.x, p.z),
-        );
+        this.race.updateControls(input, VEHICLE.fixedStep);
         this.world.step(VEHICLE.fixedStep);
         this.simTime += VEHICLE.fixedStep;
-        const near = this.track.nearest(this.car.getPosition());
-        this.laps.update(near.progress, near.distance, VEHICLE.fixedStep);
+        this.race.afterStep(VEHICLE.fixedStep);
         this.accumulator -= VEHICLE.fixedStep;
       }
     }
     const state = this.car.getDebugState();
     this.car.syncVisuals(this.paused ? 0 : dt);
-    this.track.update(state.position);
+    this.race.syncVisuals(this.paused ? 0 : dt);
+    this.track.update(state.position, state);
+    const race = this.race.getSnapshot();
+    const advice = this.track.getLineAdvice(
+      state.position,
+      state.speedMps,
+      state.frontGrip,
+    );
     this.updateCamera(dt, state);
     this.hud.update(
       state,
@@ -209,11 +218,15 @@ export class Game {
       dt,
       this.paused,
       this.cameraMode,
+      race,
+      advice,
     );
     this.telemetry.update(
       this.simTime,
       state,
       this.track.getNormalizedProgress(state.position),
+      race,
+      advice,
     );
     this.renderer.render(this.scene, this.camera);
   }

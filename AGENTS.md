@@ -24,6 +24,8 @@ Goals:
 - `src/physics/Chassis.js`, `Terrain.js`: four-wheel spring/damper suspension and shared physical heightfield.
 - `src/models/TrackLayout.js`, `Track.js`: closed circuit geometry, surfaces, collision curbs/rails and scenery.
 - `src/models/LapTracker.js`: ordered lap gates and validity.
+- `src/racing/`: race session, physical field, AI controls and curvature/braking speed profile.
+- `src/view/RacingLineView.js`: reactive arrow colors from actual speed versus the profile.
 - `src/view/`: car, build-safe existing assets, environment and lighting.
 - `src/ui/Hud.js`: instruments, minimap, setup bindings and lap display.
 - `index.html`, `src/style.css`: visual presentation and accessible controls.
@@ -52,6 +54,7 @@ High-value log streams:
 - `[Input:key-down]`, `[Input:key-up]` and event-linked `[Input:telemetry]`
 - `[Telemetry:periodic]`: JSON every 1.5 seconds, including speed, surface, forces, grounded wheel count and suspension lengths
 - `[Tune:update]`, `[Tune:transmission]`, `[Camera:mode]`, `[Game:pause]`, `[Game:reset]`
+- `[Race:phase]`, `[Race:finish]`: countdown/start and finish classification events.
 - `[Track:create]`, `[Car:model-ready]` and startup/runtime errors
 
 The former multi-line debug/repeated-key flood is replaced by structured snapshots. Keep original vehicle diagnostics keys stable when practical; `groundClearance` now describes the suspended chassis bottom above sampled terrain, and `wheelContacts` is authoritative for grounding.
@@ -250,3 +253,7 @@ When handing off work:
 ## Current physics and visuals
 
 The handling target is believable arcade racing with forgiving grip and physical bump response. Do not reintroduce a competing direct target-yaw controller or per-frame velocity steering. Raycast wheel contact and sampled terrain must agree with the visible road. Check full-throttle stability after changing tire grip allocation. Use imported GLB URLs so assets survive production builds. Keep the existing car and environment assets unless replacement is requested.
+
+## Club racing
+
+Opponents use the same Car and VehicleDynamics API as the player. AI steering uses the physical axis directly; preserve the user-approved keyboard/controller inversion only at InputState. RaceField computes controls before the world step and lap/classification state after it. RaceSession and RacingLineProfile remain independent of rendering. Guide colors reflect actual speed; do not turn them green simply because brake input is held. The lower-power/stronger-front player tune remains the accepted handling baseline.

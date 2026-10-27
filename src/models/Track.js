@@ -1,3 +1,6 @@
+import { RacingLineProfile } from "../racing/RacingLineProfile.js";
+import { RacingLineView } from "../view/RacingLineView.js";
+import { RACE } from "../racing/RaceConfig.js";
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { TrackLayout } from "./TrackLayout.js";
@@ -8,6 +11,7 @@ export class Track {
   constructor(scene) {
     this.scene = scene;
     this.layout = new TrackLayout();
+    this.lineProfile = new RacingLineProfile(this.layout);
     this.width = this.layout.width;
     this.length = this.layout.length;
     this.startProgress = 0.02;
@@ -267,27 +271,36 @@ export class Track {
     this.root.add(bill);
   }
   buildGuide() {
-    const points = this.layout.samples.map(
-      (p) =>
-        new THREE.Vector3(p.x, this.terrain.getHeight(p.x, p.z) + 0.09, p.z),
+    this.guide = new RacingLineView(
+      this.root,
+      this.layout,
+      this.terrain,
+      this.lineProfile,
     );
-    points.push(points[0]);
-    this.guide = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineDashedMaterial({
-        color: "#c9d9a9",
-        dashSize: 1.8,
-        gapSize: 3.4,
-        transparent: true,
-        opacity: 0.45,
-      }),
-    );
-    this.guide.computeLineDistances();
-    this.root.add(this.guide);
   }
   toggleGuide() {
-    this.guide.visible = !this.guide.visible;
-    return this.guide.visible;
+    return this.guide.toggle();
+  }
+  getLineAdvice(position, speed, frontGrip) {
+    return this.lineProfile.getAdvice(
+      this.layout.nearest(position).progress,
+      speed,
+      frontGrip,
+    );
+  }
+  getGridSpawn(slot) {
+    const progress =
+      this.startProgress - 0.003 - (slot * RACE.spacing) / this.length;
+    const point = this.layout.sample(progress),
+      lane = slot % 2 ? RACE.lane : -RACE.lane;
+    const x = point.x + point.nx * lane,
+      z = point.z + point.nz * lane;
+    return {
+      x,
+      z,
+      y: this.terrain.getHeight(x, z) + 0.85,
+      yaw: Math.atan2(point.tx, point.tz),
+    };
   }
   getSpawnPoint() {
     const s = this.layout.sample(this.startProgress - 0.015);
@@ -320,7 +333,8 @@ export class Track {
   getMapSamples() {
     return this.layout.samples;
   }
-  update(position) {
+  update(position, state) {
     this.environment.update(position);
+    this.guide.update(state?.speedMps ?? 0, state?.frontGrip);
   }
 }

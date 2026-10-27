@@ -15,7 +15,7 @@ export class Telemetry {
       }),
     );
   }
-  update(time, state, progress) {
+  update(time, state, progress, race, advice) {
     if (time - this.last < 1.5) return;
     this.last = time;
     console.info(
@@ -23,6 +23,13 @@ export class Telemetry {
       JSON.stringify({
         speedKmh: +(state.speedMps * 3.6).toFixed(1),
         progress: +progress.toFixed(3),
+        racePhase: race?.phase,
+        racePosition: race?.position,
+        opponentProgress: race?.entries
+          .filter((e) => !e.isPlayer)
+          .map((e) => ({ id: e.id, distance: +e.distance.toFixed(3) })),
+        lineStatus: advice?.level,
+        lineTargetKmh: advice ? Math.round(advice.targetSpeed * 3.6) : null,
         gear: state.gear,
         steer: +state.steer.toFixed(3),
         driveForce: +state.driveForce.toFixed(0),

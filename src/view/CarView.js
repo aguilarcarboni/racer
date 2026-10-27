@@ -1,8 +1,10 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { carUrl } from "./Assets.js";
+const carAsset = new GLTFLoader();
+let carTemplate;
 export class CarView {
-  constructor(scene) {
+  constructor(scene, { color = "#dd542f", id = "you" } = {}) {
     this.root = new THREE.Group();
     scene.add(this.root);
     this.wheels = [];
@@ -10,13 +12,13 @@ export class CarView {
     this.root.add(
       new THREE.Mesh(
         new THREE.BoxGeometry(1.5, 0.45, 3.5),
-        new THREE.MeshStandardMaterial({ color: "#d95835" }),
+        new THREE.MeshStandardMaterial({ color }),
       ),
     );
-    new GLTFLoader().load(
-      carUrl,
+    carTemplate ??= carAsset.loadAsync(carUrl);
+    carTemplate.then(
       (gltf) => {
-        const model = gltf.scene,
+        const model = gltf.scene.clone(true),
           box = new THREE.Box3().setFromObject(model),
           size = box.getSize(new THREE.Vector3());
         this.scale = 3.8 / Math.max(size.x, size.z);
@@ -31,7 +33,7 @@ export class CarView {
             n.material = n.material.clone();
             n.material.roughness = 0.58;
             if (n.material.name === "red") {
-              n.material.color.set("#dd542f");
+              n.material.color.set(color);
               n.material.metalness = 0.12;
             }
           }
@@ -47,11 +49,11 @@ export class CarView {
         this.root.add(model);
         console.info("[Car:model-ready]", {
           url: carUrl,
+          id,
           wheels: this.wheels.length,
           length: 3.8,
         });
       },
-      undefined,
       (error) => console.error("[Car:model-load-failed]", error),
     );
   }

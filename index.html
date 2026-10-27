@@ -20,9 +20,7 @@
           /></svg
         >RACER<span>MOTORSPORT CLUB</span></a
       >
-      <div class="session-name">
-        <i></i> FREE PRACTICE <span>01 / VALLE</span>
-      </div>
+      <div class="session-name"><i></i> CLUB RACE <span>01 / VALLE</span></div>
       <div class="header-actions">
         <button id="camera">View <kbd>C</kbd></button
         ><button id="pause">Pause <kbd>ESC</kbd></button>
@@ -42,7 +40,9 @@
     <section class="intro" id="intro">
       <span class="eyebrow">A DIFFERENT KIND OF SUNDAY.</span>
       <h1>Find your<br /><em>racing line.</em></h1>
-      <p>Golden light. Open tarmac.<br />Just you and the next corner.</p>
+      <p>
+        Golden light. Open tarmac.<br />Four cars. Three laps. Your next move.
+      </p>
       <div class="track-meta">
         <strong>01</strong
         ><span
@@ -53,7 +53,7 @@
         >
       </div>
       <div class="drive-hint">
-        <kbd>W</kbd> TO DRIVE <span>AUTOMATIC GEARS ON</span>
+        <kbd>W</kbd> TO START RACE <span>AUTOMATIC GEARS ON</span>
       </div>
     </section>
     <aside class="map-panel">
@@ -64,7 +64,7 @@
         id="minimap"
         viewBox="0 0 220 220"
         role="img"
-        aria-label="Circuit map and current car position"
+        aria-label="Circuit map and all race cars"
       >
         <path
           id="map-edge"
@@ -81,6 +81,7 @@
           stroke-linejoin="round"
         />
         <circle id="map-start" r="4" fill="#ebc391" />
+        <g id="map-opponents"></g>
         <g id="map-car">
           <circle r="7" fill="#d75835" opacity=".2" />
           <circle r="3.5" fill="#eb714d" stroke="#fff2df" stroke-width="1.5" />
@@ -90,6 +91,22 @@
         <i></i> YOUR CAR <span>START / FINISH</span>
       </div>
     </aside>
+    <section
+      class="race-panel"
+      id="race-panel"
+      hidden
+      aria-label="Race standings"
+    >
+      <div class="race-position">
+        <span>POSITION</span><strong id="race-position">3 / 4</strong>
+      </div>
+      <div class="standings-title" id="race-state">LIVE STANDINGS</div>
+      <div id="standings-body"></div>
+      <div class="line-legend">
+        <i class="green"></i>GO <i class="amber"></i>EASE OFF
+        <i class="red"></i>BRAKE
+      </div>
+    </section>
     <div class="corner">
       <span class="corner-arrow">&#8599;</span
       ><span id="corner-cue">Find your rhythm. Follow the line.</span>
@@ -195,7 +212,7 @@
       <span><kbd>W / S</kbd> Throttle / brake & reverse</span
       ><span><kbd>A / D</kbd> Steer</span><span><kbd>SPACE</kbd> Handbrake</span
       ><span><kbd>&uarr; / &darr;</kbd> Manual shift</span
-      ><button id="reset">Reset car <kbd>R</kbd></button
+      ><button id="reset">Restart race <kbd>R</kbd></button
       ><span class="camera-tag" id="camera-label">CHASE</span>
     </footer>
     <script type="module" src="/src/main.js"></script>
