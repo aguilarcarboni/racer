@@ -2,8 +2,8 @@ import { clamp } from "../physics/VehicleConfig.js";
 export function mergeInputState(keyboard, gamepad) {
   const steerAxis = clamp(
     (gamepad.steerAxis || 0) +
-      (keyboard.right ? 1 : 0) -
-      (keyboard.left ? 1 : 0),
+      (keyboard.left ? 1 : 0) -
+      (keyboard.right ? 1 : 0),
     -1,
     1,
   );

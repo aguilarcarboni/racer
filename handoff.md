@@ -27,3 +27,7 @@ Root causes addressed: reversed input merge; throttle excluding brake logic; fro
 W/S throttle, brake and reverse; A/D steering; Space handbrake; C chase/hood/circuit camera; G auto/manual; Up/Down manual shift; L guide; R reset; Escape pause. Open Car setup for the existing tuning controls plus suspension firmness.
 
 The next action is the user's first drive. Follow the repository's fast playtest loop: collect their handling/bump/camera feedback before making another physics or gameplay iteration. Keep this as an arcade-friendly prototype rather than claiming a calibrated real-car simulator. Controller hardware, force-feedback wheels, mobile controls and human full-lap acceptance remain unverified. There are no opponents, races, networking, vehicle damage or tire wear yet.
+
+## A/D playtest correction
+
+The user reported inverted keyboard steering and explicitly requested swapping A and D. Reversed only the keyboard steering contributions in InputState; retained the controller axis mapping. Updated the existing mapping assertions. Validate with npm test and npm run build, then obtain the next user playtest feedback before further handling edits.

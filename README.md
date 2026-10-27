@@ -37,7 +37,7 @@ The goal is approachable, believable arcade handling: progressive grip, useful b
 - Rendered terrain and wheel collision queries use the same sampled heightfield. Road undulation is physical; raised curb strips have their own collision mesh.
 - Front/rear slip angles include yaw velocity at each axle. Smooth tire-force saturation and a combined friction circle limit lateral and longitudinal grip together.
 - Traction control reserves rear cornering grip under full throttle. The old separate target-yaw controller is removed; low-speed steering blends into the tire model.
-- Steering is smoothed and limited with speed. Corrected input signs mean D and controller-right turn right.
+- Steering is smoothed and limited with speed. Keyboard A/D polarity follows the requested reversed mapping; controller polarity is retained.
 - Brakes remain effective when throttle is held. Automatic shifting and brake-to-reverse make the default drive accessible, while manual shifting remains available.
 - Surface grip and drag change off the asphalt. Contact is required for tire traction, so throttle cannot steer or accelerate an airborne chassis through tire force.
 - Fixed 120 Hz physics; rendering follows model state. A hidden tab pauses. Long frame stalls are capped to avoid runaway catch-up, which can slow simulation under heavy load.
