@@ -1,9 +1,11 @@
 # AGENTS.md
 
 ## Purpose
+
 This file defines how contributors (human or AI agents) should work in this repository.
 
 Goals:
+
 - Keep physics and gameplay behavior understandable.
 - Preserve and improve architecture quality.
 - Use strong OOP practices as features are added.
@@ -13,60 +15,46 @@ Goals:
 
 ## Repository Map
 
-- `src/main.js`
-  - App entrypoint.
-  - Installs browser-to-terminal logging bridge.
-  - Creates and starts `Game`.
-
-- `src/core/Game.js`
-  - Orchestrates app lifecycle and game loop.
-  - Owns world stepping, camera follow, HUD updates.
-  - Owns UI tuning controls and telemetry emission.
-
-- `src/core/InputController.js`
-  - Keyboard input source.
-  - Emits key state changes and input telemetry events.
-
-- `src/core/TerminalLogger.js`
-  - Mirrors browser `console.*` + runtime errors to Vite terminal.
-
-- `src/models/Car.js`
-  - Vehicle simulation/controller logic.
-  - Contains simcade dynamics and tuning parameters.
-  - Exposes `setTuning(...)` and `getDebugState()`.
-
-- `src/models/Track.js`
-  - Track scene model and normalized progress helper.
-
-- `vite.config.js`
-  - Dev middleware endpoint (`/__client-log`) for log bridge.
-
-- `index.html`
-  - HUD + tuning panel markup.
-
-- `handoff.md`
-  - Current state summary and next-step roadmap.
+- `src/main.js`: logger and app entry point.
+- `src/core/Game.js`: orchestration, fixed 120 Hz update order, camera, pause and lifecycle.
+- `src/core/InputController.js`, `GamepadController.js`, `InputState.js`: input collection and consistent signs.
+- `src/core/Telemetry.js`, `TerminalLogger.js`: event/throttled JSON telemetry and browser-to-terminal bridge.
+- `src/models/Car.js`: chassis, dynamics and view composition; public vehicle API.
+- `src/physics/VehicleDynamics.js`, `TireModel.js`, `PowertrainModel.js`, `VehicleConfig.js`: vehicle behavior and validated configuration.
+- `src/physics/Chassis.js`, `Terrain.js`: four-wheel spring/damper suspension and shared physical heightfield.
+- `src/models/TrackLayout.js`, `Track.js`: closed circuit geometry, surfaces, collision curbs/rails and scenery.
+- `src/models/LapTracker.js`: ordered lap gates and validity.
+- `src/view/`: car, build-safe existing assets, environment and lighting.
+- `src/ui/Hud.js`: instruments, minimap, setup bindings and lap display.
+- `index.html`, `src/style.css`: visual presentation and accessible controls.
+- `tests/`: behavior tests including a full conservative drive on the actual circuit.
+- `handoff.md`: current implementation, evidence and next playtest.
 
 ---
 
 ## Runtime & Logs
 
 ### Dev server
+
 - Run: `npm run dev`
 - URL: `http://localhost:5173/`
 
 ### Build check
+
 - Run: `npm run build`
 
 ### Logging contract
+
 All critical client logs should be visible in terminal.
 
 High-value log streams:
-- `[Input:key-down]`, `[Input:key-up]`, `[Input:key-down-repeat]`
-- `[Input:telemetry]` (event-linked snapshot)
-- `[Telemetry:periodic]` (throttled runtime status)
-- `[Debug frame=...]` (throttled physics detail)
-- `[Tune:update]` (live tuning changes)
+
+- `[Input:key-down]`, `[Input:key-up]` and event-linked `[Input:telemetry]`
+- `[Telemetry:periodic]`: JSON every 1.5 seconds, including speed, surface, forces, grounded wheel count and suspension lengths
+- `[Tune:update]`, `[Tune:transmission]`, `[Camera:mode]`, `[Game:pause]`, `[Game:reset]`
+- `[Track:create]`, `[Car:model-ready]` and startup/runtime errors
+
+The former multi-line debug/repeated-key flood is replaced by structured snapshots. Keep original vehicle diagnostics keys stable when practical; `groundClearance` now describes the suspended chassis bottom above sampled terrain, and `wheelContacts` is authoritative for grounding.
 
 Do not remove logging paths unless replacing them with better-structured equivalents.
 
@@ -77,27 +65,33 @@ Do not remove logging paths unless replacing them with better-structured equival
 Use these as hard rules when changing code.
 
 ### 1) Single Responsibility
+
 Each class should have one primary reason to change.
+
 - `Game`: orchestration only.
-- `Car`: vehicle simulation only.
+- `Car`: vehicle composition only; dynamics, tires, powertrain, suspension construction and rendering live in their own modules.
 - `InputController`: input collection only.
 - `Track`: track representation only.
 
 If a class starts owning multiple domains, split it.
 
 ### 2) Encapsulation
+
 - Keep internal state private by convention (class-owned, not externally mutated).
 - External code should interact through small explicit methods.
 - Avoid reaching into nested internals from other modules.
 
 Example:
+
 - Good: `car.setTuning({...})`
 - Bad: `car.frontGrip = ...` from outside.
 
 ### 3) Explicit Interfaces
+
 When adding behavior, prefer clear methods over direct field coupling.
 
 Recommended pattern:
+
 - `setTuning(params)`
 - `getDebugState()`
 - `updatePhysics(input, dt)`
@@ -105,12 +99,15 @@ Recommended pattern:
 Keep method contracts stable and documented in code comments when non-obvious.
 
 ### 4) Separation of Model vs View
+
 - Simulation model state lives in physics/model classes.
 - Rendering/HUD classes read model state but do not own physics rules.
 - UI controls should call model APIs, not patch model internals ad hoc.
 
 ### 5) Composition over Monoliths
+
 If `Car.js` grows further, split into composed components:
+
 - `PowertrainModel`
 - `TireModel`
 - `StabilityAssist`
@@ -119,7 +116,9 @@ If `Car.js` grows further, split into composed components:
 `Car` remains the orchestrator of these components.
 
 ### 6) Deterministic Update Flow
+
 Keep update order explicit and consistent:
+
 1. Input sampling
 2. Vehicle/control update
 3. Physics step
@@ -129,9 +128,11 @@ Keep update order explicit and consistent:
 Do not introduce hidden side effects that break determinism.
 
 ### 7) Validate Inputs
+
 Any externally-driven values (UI sliders, presets) must be clamped/validated at API boundaries.
 
 ### 8) Minimize Temporal Coupling
+
 Avoid requiring methods to be called in fragile hidden sequences.
 When sequence matters, enforce it with guard clauses and clear naming.
 
@@ -140,6 +141,7 @@ When sequence matters, enforce it with guard clauses and clear naming.
 ## Physics Extension Guidelines
 
 When adding new physics features:
+
 1. Add fields with sane defaults.
 2. Integrate into `setTuning(...)` if user-tunable.
 3. Surface relevant diagnostics in `getDebugState()`.
@@ -147,6 +149,7 @@ When adding new physics features:
 5. Verify with `npm run build`.
 
 For each change, define expected behavior in plain terms:
+
 - What should increase/decrease?
 - At low speed vs high speed?
 - Under throttle, brake, and lift-off?
@@ -156,9 +159,10 @@ For each change, define expected behavior in plain terms:
 ## UI Tuning Guidelines
 
 When adding a tunable variable:
+
 1. Add slider + value label in `index.html`.
-2. Wire it in `main.js` HUD `tune` object.
-3. Bind event in `Game.setupTuningUi()`.
+2. Wire it in `Hud.bindTuning()`, called by `Game.setupTuningUi()`.
+3. Add model-boundary validation and expose it in diagnostics.
 4. Route to `car.setTuning(...)`.
 5. Emit `[Tune:update]` with the updated value.
 
@@ -197,11 +201,13 @@ Never claim physics behavior without checking logs.
 ## Safe Refactor Boundaries
 
 Safe to refactor:
+
 - Internal details of `Car.updatePhysics`.
 - Telemetry formatting and throttle intervals.
 - HUD panel layout/structure.
 
 Be careful when changing:
+
 - `Game.tick()` order.
 - `Car.getDebugState()` keys (telemetry consumers depend on them).
 - Log bridge endpoint (`/__client-log`).
@@ -210,18 +216,16 @@ Be careful when changing:
 
 ## Preferred Next Refactors
 
-1. Introduce `VehicleConfig` object for all tunable defaults.
-2. Extract tire/grip calculations into a dedicated helper class/module.
-3. Add preset manager:
-   - save/load/reset tuning profiles.
-4. Add debug mode levels:
-   - `minimal`, `normal`, `verbose`.
+1. Save/load/reset tuning profiles.
+2. Controller hardware acceptance and wheel support as requested.
+3. Add further diagnostic levels only when the existing structured snapshots are insufficient.
 
 ---
 
 ## Collaboration Notes
 
 When handing off work:
+
 - Update `handoff.md` with:
   - what changed,
   - why,
@@ -230,13 +234,19 @@ When handing off work:
 - Keep `AGENTS.md` aligned with any architectural or logging changes.
 
 ### Fast Playtest Loop (Immediate Feedback)
+
 - Assume the user tests immediately after each gameplay/physics code change.
 - After implementing such changes, pause and wait for user test feedback before applying further code edits.
 - Use incoming terminal-mirrored client logs as primary validation input for the next iteration.
 - Prefer small, isolated changes per iteration so test outcomes are attributable.
 
 ### Bug-Fix Rule (Root Cause First)
+
 - Before applying a fix, read the relevant source code path end-to-end and identify likely logic-level root causes.
 - Do not start with random parameter tweaks when behavior indicates a potential logic/sign/order issue.
 - For handling/physics bugs, form a short hypothesis from code + logs, then patch the root cause first.
 - Use fallback tuning tweaks only after the logic path is validated.
+
+## Current physics and visuals
+
+The handling target is believable arcade racing with forgiving grip and physical bump response. Do not reintroduce a competing direct target-yaw controller or per-frame velocity steering. Raycast wheel contact and sampled terrain must agree with the visible road. Check full-throttle stability after changing tire grip allocation. Use imported GLB URLs so assets survive production builds. Keep the existing car and environment assets unless replacement is requested.

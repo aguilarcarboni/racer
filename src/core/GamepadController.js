@@ -42,7 +42,7 @@ export class GamepadController {
     }
 
     const rawSteer = this.readAxis(gamepad, 0);
-    const steer = -this.applyDeadzone(rawSteer, this.deadzone);
+    const steer = this.applyDeadzone(rawSteer, this.deadzone);
     const leftStickY = this.readAxis(gamepad, 1);
     const leftStickThrottle = this.applyDeadzone(-leftStickY, this.deadzone);
     const triggerThrottle = this.readTrigger(gamepad, 7);
@@ -54,10 +54,11 @@ export class GamepadController {
     const state = {
       connected: true,
       source: 'gamepad',
+      handbrake: Boolean(gamepad.buttons?.[2]?.pressed),
       forward: throttle > 0.08,
       backward: brake > 0.08,
-      left: steer > 0.08,
-      right: steer < -0.08,
+      left: steer < -0.08,
+      right: steer > 0.08,
       steerAxis: steer,
       throttleAxis: throttle,
       brakeAxis: brake,

@@ -1,484 +1,326 @@
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-
+import * as THREE from "three";
+import * as CANNON from "cannon-es";
+import { TrackLayout } from "./TrackLayout.js";
+import { Terrain } from "../physics/Terrain.js";
+import { Environment, material, box, label } from "../view/Environment.js";
+import { placeAsset } from "../view/Assets.js";
 export class Track {
-  constructor(scene, { width = 20, zOffset = 0, gridSize = 14 } = {}) {
+  constructor(scene) {
     this.scene = scene;
-    this.width = width;
-    this.zOffset = zOffset;
-    this.gridSize = gridSize;
-
-    this.mesh = null;
-    this.centerSamples = [];
-    this.lastProgressLogAt = 0;
-    this.progressLogIntervalMs = 300;
-
-    this.gridTiles = new Map();
-    this.length = 0;
-    this.spawnCenter = new THREE.Vector3(0, 0.12, 0);
-
-    this.modelLoader = new GLTFLoader();
-    this.modelCache = new Map();
+    this.layout = new TrackLayout();
+    this.width = this.layout.width;
+    this.length = this.layout.length;
+    this.startProgress = 0.02;
+    this.terrain = new Terrain();
+    this.root = new THREE.Group();
+    scene.add(this.root);
   }
-
-  create() {
-    this.mesh = new THREE.Group();
-    this.scene.add(this.mesh);
-
-    this.buildStarterGrid();
-    this.refreshCenterSamples();
-    this.refreshTrackLength();
-    this.addRoadPlane();
-    this.addDebugPathLine();
-    this.instantiateGridTiles();
-
-    console.info('[Track:create] Track created', {
-      gridTiles: this.gridTiles.size,
-      samples: this.centerSamples.length,
-      models: ['/models/roadStraight.glb'],
-    });
-    const center = this.centerSamples[0] || this.gridToWorld(0, 0);
-    console.info('[Track:center]', { x: center.x, y: center.y, z: center.z });
-    const starterTileCenter = this.gridToWorld(0, 0);
-    console.info('[Track:tile-center]', { gridX: 0, gridY: 0, x: starterTileCenter.x, y: starterTileCenter.y, z: starterTileCenter.z });
-  }
-
-  buildStarterGrid() {
-    this.gridTiles.clear();
-
-    const straightTilesPerSide = 6;
-    const farEdge = straightTilesPerSide + 1;
-
-    this.setGridTile(0, 0, {
-      type: 'corner',
-      modelPath: '/models/roadCornerSmall.glb',
-      yaw: Math.PI / 2,
-    });
-
-    for (let gridY = 1; gridY < farEdge; gridY += 1) {
-      this.setGridTile(0, gridY, {
-        type: 'straight',
-        modelPath: '/models/roadStraight.glb',
-        yaw: 0,
-      });
-    }
-
-    this.setGridTile(0, farEdge, {
-      type: 'corner',
-      modelPath: '/models/roadCornerSmall.glb',
-      yaw: 0,
-    });
-
-    for (let gridX = -1; gridX > -farEdge; gridX -= 1) {
-      this.setGridTile(gridX, farEdge, {
-        type: 'straight',
-        modelPath: '/models/roadStraight.glb',
-        yaw: Math.PI / 2,
-      });
-    }
-
-    this.setGridTile(-farEdge, farEdge, {
-      type: 'corner',
-      modelPath: '/models/roadCornerSmall.glb',
-      yaw: (3 * Math.PI) / 2,
-    });
-
-    for (let gridY = farEdge - 1; gridY > 0; gridY -= 1) {
-      this.setGridTile(-farEdge, gridY, {
-        type: 'straight',
-        modelPath: '/models/roadStraight.glb',
-        yaw: 0,
-      });
-    }
-
-    this.setGridTile(-farEdge, 0, {
-      type: 'corner',
-      modelPath: '/models/roadCornerSmall.glb',
-      yaw: Math.PI,
-    });
-
-    for (let gridX = -farEdge + 1; gridX < 0; gridX += 1) {
-      this.setGridTile(gridX, 0, {
-        type: 'straight',
-        modelPath: '/models/roadStraight.glb',
-        yaw: Math.PI / 2,
-      });
-    }
-  }
-
-  setGridTile(gridX, gridY, tile) {
-    const x = Number.isFinite(gridX) ? Math.trunc(gridX) : 0;
-    const y = Number.isFinite(gridY) ? Math.trunc(gridY) : 0;
-
-    const safeTile = {
-      type: tile?.type || 'straight',
-      modelPath: tile?.modelPath || '/models/roadStraight.glb',
-      yaw: Number.isFinite(tile?.yaw) ? tile.yaw : 0,
+  create(world, groundMaterial) {
+    this.terrain.createBody(world, groundMaterial);
+    this.environment = new Environment(this.scene, this.terrain, this.layout);
+    this.strip(-11, 11, 0.01, material("#c5b799", 0.99));
+    this.strip(-7.25, 7.25, 0.025, material("#515851", 0.96));
+    const asphaltCanvas = document.createElement("canvas");
+    asphaltCanvas.width = asphaltCanvas.height = 256;
+    const ctx = asphaltCanvas.getContext("2d");
+    ctx.fillStyle = "#737873";
+    ctx.fillRect(0, 0, 256, 256);
+    let seed = 30;
+    const rnd = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
     };
-
-    this.gridTiles.set(this.getGridKey(x, y), {
-      gridX: x,
-      gridY: y,
-      ...safeTile,
+    for (let i = 0; i < 20000; i++) {
+      ctx.fillStyle = i % 2 ? "rgba(0,0,0,.1)" : "rgba(255,255,230,.12)";
+      ctx.fillRect(rnd() * 256, rnd() * 256, 1, 1);
+    }
+    const texture = new THREE.CanvasTexture(asphaltCanvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(2, 80);
+    texture.anisotropy = 8;
+    this.strip(-6, 6, 0.04, material("#a3aaa4", 0.9, { map: texture }));
+    for (const side of [-1, 1]) {
+      this.strip(side * 5.77, side * 5.88, 0.047, material("#e8e7d8"));
+      const curb = this.strip(side * 6, side * 7.2, 0.105, null, true);
+      const shape = new CANNON.Trimesh(
+        Array.from(curb.geometry.attributes.position.array),
+        Array.from(curb.geometry.index.array),
+      );
+      const body = new CANNON.Body({ mass: 0, material: groundMaterial });
+      body.addShape(shape);
+      body.updateAABB();
+      world.addBody(body);
+      this.guardrail(side, world, groundMaterial);
+    }
+    this.startFinish();
+    this.paddock();
+    this.buildGuide();
+    console.info("[Track:create]", {
+      name: "Valle Motor Park",
+      length: this.length,
+      width: this.width,
+      samples: this.layout.samples.length,
+      suspensionSurface: "heightfield + raised curb mesh",
     });
   }
-
-  getGridKey(gridX, gridY) {
-    return `${gridX},${gridY}`;
-  }
-
-  gridToWorld(gridX, gridY) {
-    return new THREE.Vector3(
-      gridX * this.gridSize,
-      0.12,
-      this.zOffset + gridY * this.gridSize
-    );
-  }
-
-  refreshCenterSamples() {
-    const pathTiles = this.tracePathTiles();
-    const points = [];
-
-    const addPoint = (point) => {
-      if (points.length === 0) {
-        points.push(point.clone());
-        return;
+  strip(inner, outer, height, mat, curb = false) {
+    const positions = [],
+      uv = [],
+      indices = [],
+      colors = [],
+      n = this.layout.samples.length,
+      columns = Math.max(1, Math.ceil(Math.abs(outer - inner)));
+    for (let i = 0; i <= n; i++) {
+      const p = this.layout.samples[i % n];
+      for (let column = 0; column <= columns; column++) {
+        const offset = inner + ((outer - inner) * column) / columns;
+        const x = p.x + p.nx * offset,
+          z = p.z + p.nz * offset;
+        positions.push(x, this.terrain.getHeight(x, z) + height, z);
+        uv.push(column / columns, i / n);
+        const color = new THREE.Color(
+          curb
+            ? Math.floor((i * this.length) / n / 3) % 2
+              ? "#ede7d7"
+              : "#c96043"
+            : "#ffffff",
+        );
+        colors.push(color.r, color.g, color.b);
       }
-      const last = points[points.length - 1];
-      const dx = last.x - point.x;
-      const dz = last.z - point.z;
-      if (dx * dx + dz * dz > 1e-6) {
-        points.push(point.clone());
-      }
-    };
-
-    for (const segment of pathTiles) {
-      const segmentSamples = this.sampleTileCenterline(segment.tile, segment.entryDir, segment.exitDir);
-      for (const sample of segmentSamples) addPoint(sample);
-    }
-
-    this.centerSamples = points;
-    const spawnTile = pathTiles[0]?.tile;
-    this.spawnCenter = spawnTile
-      ? this.gridToWorld(spawnTile.gridX, spawnTile.gridY)
-      : this.gridToWorld(0, 0);
-  }
-
-  tracePathTiles() {
-    const tiles = Array.from(this.gridTiles.values());
-    if (tiles.length === 0) return [];
-
-    const byKey = new Map();
-    for (const tile of tiles) byKey.set(this.getGridKey(tile.gridX, tile.gridY), tile);
-
-    const links = new Map();
-    for (const tile of tiles) {
-      const key = this.getGridKey(tile.gridX, tile.gridY);
-      const tileLinks = [];
-      const connectors = this.getTileConnectors(tile);
-      for (const dir of connectors) {
-        const neighbor = this.getNeighborCoords(tile.gridX, tile.gridY, dir);
-        const neighborTile = byKey.get(this.getGridKey(neighbor.gridX, neighbor.gridY));
-        if (!neighborTile) continue;
-        const neighborConnectors = this.getTileConnectors(neighborTile);
-        if (!neighborConnectors.includes(this.getOppositeDirection(dir))) continue;
-        tileLinks.push({ key: this.getGridKey(neighbor.gridX, neighbor.gridY), dir });
-      }
-      links.set(key, tileLinks);
-    }
-
-    const startTile = this.pickStartTile(tiles, links);
-    if (!startTile) return [];
-
-    const ordered = [];
-    const visited = new Set();
-    let prevKey = null;
-    let currentKey = this.getGridKey(startTile.gridX, startTile.gridY);
-
-    for (let i = 0; i < tiles.length; i += 1) {
-      if (visited.has(currentKey)) break;
-      visited.add(currentKey);
-      const tile = byKey.get(currentKey);
-      if (!tile) break;
-
-      const tileConnectors = this.getTileConnectors(tile);
-      const tileLinks = links.get(currentKey) || [];
-      const nextLink = tileLinks.find((link) => link.key !== prevKey) || null;
-      const entryDir = prevKey
-        ? this.directionFromTileToTile(tile, byKey.get(prevKey))
-        : (tileConnectors.find((dir) => dir !== nextLink?.dir) || tileConnectors[0]);
-      const exitDir = nextLink?.dir || (tileConnectors.find((dir) => dir !== entryDir) || entryDir);
-
-      ordered.push({ tile, entryDir, exitDir });
-
-      if (!nextLink) break;
-      prevKey = currentKey;
-      currentKey = nextLink.key;
-    }
-
-    return ordered;
-  }
-
-  pickStartTile(tiles, links) {
-    const endpoint = tiles.find((tile) => {
-      const tileLinks = links.get(this.getGridKey(tile.gridX, tile.gridY)) || [];
-      return tileLinks.length <= 1;
-    });
-    if (endpoint) return endpoint;
-    return tiles
-      .slice()
-      .sort((a, b) => (a.gridY - b.gridY) || (a.gridX - b.gridX))[0];
-  }
-
-  getTileConnectors(tile) {
-    const quarterTurns = this.getQuarterTurns(tile.yaw);
-    if (tile.type === 'corner') {
-      // Base corner shape is a right turn in grid space.
-      return ['N', 'W'].map((dir) => this.rotateDirection(dir, quarterTurns));
-    }
-    return ['N', 'S'].map((dir) => this.rotateDirection(dir, quarterTurns));
-  }
-
-  getQuarterTurns(yaw) {
-    return Math.round(yaw / (Math.PI / 2));
-  }
-
-  rotateDirection(dir, quarterTurns) {
-    const cycle = ['N', 'W', 'S', 'E'];
-    const idx = cycle.indexOf(dir);
-    if (idx < 0) return dir;
-    const turns = ((quarterTurns % 4) + 4) % 4;
-    return cycle[(idx + turns) % 4];
-  }
-
-  getOppositeDirection(dir) {
-    if (dir === 'N') return 'S';
-    if (dir === 'S') return 'N';
-    if (dir === 'E') return 'W';
-    return 'E';
-  }
-
-  getNeighborCoords(gridX, gridY, dir) {
-    if (dir === 'N') return { gridX, gridY: gridY - 1 };
-    if (dir === 'S') return { gridX, gridY: gridY + 1 };
-    if (dir === 'E') return { gridX: gridX + 1, gridY };
-    return { gridX: gridX - 1, gridY };
-  }
-
-  directionFromTileToTile(fromTile, toTile) {
-    if (!toTile) return 'N';
-    const dx = toTile.gridX - fromTile.gridX;
-    const dy = toTile.gridY - fromTile.gridY;
-    if (dx > 0) return 'E';
-    if (dx < 0) return 'W';
-    if (dy > 0) return 'S';
-    return 'N';
-  }
-
-  getDirectionVector(dir) {
-    if (dir === 'N') return { x: 0, z: -1 };
-    if (dir === 'S') return { x: 0, z: 1 };
-    if (dir === 'E') return { x: 1, z: 0 };
-    return { x: -1, z: 0 };
-  }
-
-  sampleTileCenterline(tile, entryDir, exitDir) {
-    const center = this.gridToWorld(tile.gridX, tile.gridY);
-    const half = this.gridSize * 0.5;
-    const entryVec = this.getDirectionVector(entryDir);
-    const exitVec = this.getDirectionVector(exitDir);
-    const entryPoint = { x: entryVec.x * half, z: entryVec.z * half };
-    const exitPoint = { x: exitVec.x * half, z: exitVec.z * half };
-
-    const toWorld = (local) => new THREE.Vector3(center.x + local.x, center.y, center.z + local.z);
-
-    if (tile.type !== 'corner') {
-      const points = [];
-      const steps = 6;
-      for (let i = 0; i < steps; i += 1) {
-        const t = i / (steps - 1);
-        points.push(toWorld({
-          x: THREE.MathUtils.lerp(entryPoint.x, exitPoint.x, t),
-          z: THREE.MathUtils.lerp(entryPoint.z, exitPoint.z, t),
-        }));
-      }
-      return points;
-    }
-
-    const centerLocal = {
-      x: (entryVec.x + exitVec.x) * half,
-      z: (entryVec.z + exitVec.z) * half,
-    };
-    const startAngle = Math.atan2(entryPoint.z - centerLocal.z, entryPoint.x - centerLocal.x);
-    const endAngle = Math.atan2(exitPoint.z - centerLocal.z, exitPoint.x - centerLocal.x);
-    let delta = endAngle - startAngle;
-    while (delta <= -Math.PI) delta += Math.PI * 2;
-    while (delta > Math.PI) delta -= Math.PI * 2;
-
-    const points = [];
-    const steps = 10;
-    for (let i = 0; i < steps; i += 1) {
-      const t = i / (steps - 1);
-      const angle = startAngle + delta * t;
-      points.push(toWorld({
-        x: centerLocal.x + Math.cos(angle) * half,
-        z: centerLocal.z + Math.sin(angle) * half,
-      }));
-    }
-    return points;
-  }
-
-  refreshTrackLength() {
-    let sum = 0;
-    for (let i = 1; i < this.centerSamples.length; i += 1) {
-      sum += this.centerSamples[i - 1].distanceTo(this.centerSamples[i]);
-    }
-    this.length = sum;
-  }
-
-  instantiateGridTiles() {
-    for (const tile of this.gridTiles.values()) {
-      this.loadTileModel(tile, (model, scale) => {
-        model.scale.setScalar(scale);
-        this.normalizeTileTransform(model);
-
-        model.traverse((node) => {
-          if (node.isMesh) {
-            node.castShadow = true;
-            node.receiveShadow = true;
-          }
-        });
-
-        const tileRoot = new THREE.Group();
-        tileRoot.position.copy(this.gridToWorld(tile.gridX, tile.gridY));
-        tileRoot.rotation.y = tile.yaw + this.getModelYawOffset(tile.modelPath);
-        tileRoot.add(model);
-        this.mesh.add(tileRoot);
-      });
-    }
-  }
-
-  getModelYawOffset(modelPath) {
-    if (modelPath === '/models/roadCornerSmall.glb') return Math.PI;
-    return 0;
-  }
-
-  normalizeTileTransform(tileRoot) {
-    const bounds = new THREE.Box3().setFromObject(tileRoot);
-    const center = new THREE.Vector3();
-    bounds.getCenter(center);
-
-    // Recenter tile pivot so world position maps to visual center of the road cell.
-    tileRoot.position.x -= center.x;
-    tileRoot.position.z -= center.z;
-
-    // Keep the model resting on y=0 in local space before world placement.
-    tileRoot.position.y -= bounds.min.y;
-  }
-
-  loadTileModel(tile, onReady) {
-    const { modelPath } = tile;
-
-    if (this.modelCache.has(modelPath)) {
-      const cached = this.modelCache.get(modelPath);
-      onReady(cached.source.clone(true), cached.scale);
-      return;
-    }
-
-    this.modelLoader.load(
-      modelPath,
-      (gltf) => {
-        const source = gltf.scene || gltf.scenes?.[0];
-        if (!source) {
-          console.error('[Track:model-load-failed]', { model: modelPath, reason: 'missing scene' });
-          return;
+      if (i < n) {
+        for (let column = 0; column < columns; column++) {
+          const a = i * (columns + 1) + column,
+            b = a + columns + 1;
+          indices.push(a, b, a + 1, a + 1, b, b + 1);
         }
-
-        const bounds = new THREE.Box3().setFromObject(source);
-        const size = new THREE.Vector3();
-        bounds.getSize(size);
-        const sourceLength = Math.max(size.x, size.z, 1e-3);
-        const scale = this.gridSize / sourceLength;
-
-        this.modelCache.set(modelPath, { source, scale });
-        onReady(source.clone(true), scale);
-      },
-      undefined,
-      (error) => {
-        console.error('[Track:model-load-failed]', { model: modelPath, error });
       }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(indices);
+    g.computeVertexNormals();
+    if (curb)
+      g.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    const m = new THREE.Mesh(
+      g,
+      mat ||
+        material("#ffffff", 0.8, {
+          vertexColors: true,
+          side: THREE.DoubleSide,
+        }),
     );
+    m.material.side = THREE.DoubleSide;
+    m.receiveShadow = true;
+    this.root.add(m);
+    return m;
   }
-
-  addRoadPlane() {
-    const bounds = new THREE.Box3().setFromPoints(this.centerSamples);
-    const center = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3());
-    const planeWidth = Math.max(this.gridSize, size.x + this.width * 2);
-    const planeLength = Math.max(this.gridSize, size.z + this.width * 2);
-
-    const roadPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(planeWidth, planeLength),
-      new THREE.MeshStandardMaterial({
-        color: 0x3f454c,
-        roughness: 0.95,
-        metalness: 0,
-      })
+  guardrail(side, world, groundMaterial) {
+    const railMat = material("#b0b9b1", 0.43, { metalness: 0.35 }),
+      postMat = material("#6e8076");
+    const count = 120,
+      posts = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(0.12, 0.9, 0.12),
+        postMat,
+        count,
+      ),
+      dummy = new THREE.Object3D();
+    for (let i = 0; i < count; i++) {
+      const a = this.layout.sample(i / count),
+        b = this.layout.sample((i + 1) / count);
+      const offset = side;
+      const ax = a.x + a.nx * 11.8 * offset,
+        az = a.z + a.nz * 11.8 * offset,
+        cx = b.x + b.nx * 11.8 * offset,
+        cz = b.z + b.nz * 11.8 * offset,
+        ay = this.terrain.getHeight(ax, az),
+        cy = this.terrain.getHeight(cx, cz),
+        length = Math.hypot(cx - ax, cz - az);
+      dummy.position.set(ax, ay + 0.45, az);
+      dummy.rotation.set(0, Math.atan2(cx - ax, cz - az), 0);
+      dummy.updateMatrix();
+      posts.setMatrixAt(i, dummy.matrix);
+      for (const level of [0.48, 0.76]) {
+        const m = box(
+          this.root,
+          [0.09, 0.18, length + 0.2],
+          [(ax + cx) / 2, (ay + cy) / 2 + level, (az + cz) / 2],
+          railMat,
+        );
+        m.rotation.y = Math.atan2(cx - ax, cz - az);
+        m.castShadow = false;
+      }
+      const body = new CANNON.Body({ mass: 0, material: groundMaterial });
+      body.addShape(
+        new CANNON.Box(new CANNON.Vec3(0.12, 0.45, length / 2 + 0.12)),
+      );
+      body.position.set((ax + cx) / 2, (ay + cy) / 2 + 0.45, (az + cz) / 2);
+      body.quaternion.setFromEuler(0, Math.atan2(cx - ax, cz - az), 0);
+      body.updateAABB();
+      world.addBody(body);
+    }
+    this.root.add(posts);
+  }
+  startFinish() {
+    const p = this.layout.sample(this.startProgress),
+      y = this.terrain.getHeight(p.x, p.z),
+      root = new THREE.Group();
+    root.position.set(p.x, y, p.z);
+    root.rotation.y = Math.atan2(p.tx, p.tz);
+    this.root.add(root);
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 64;
+    const c = canvas.getContext("2d");
+    for (let x = 0; x < 16; x++)
+      for (let z = 0; z < 2; z++) {
+        c.fillStyle = (x + z) % 2 ? "#ece9d9" : "#2d3934";
+        c.fillRect(x * 32, z * 32, 32, 32);
+      }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const line = new THREE.Mesh(
+      new THREE.PlaneGeometry(12, 1.5),
+      new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8 }),
     );
-    roadPlane.rotation.x = -Math.PI / 2;
-    roadPlane.position.set(center.x, 0.11, center.z);
-    roadPlane.receiveShadow = true;
-    this.mesh.add(roadPlane);
+    line.rotation.x = -Math.PI / 2;
+    line.position.y = 0.06;
+    root.add(line);
+    const steel = material("#344a43");
+    for (const x of [-7.6, 7.6])
+      box(root, [0.35, 6.6, 0.35], [x, 3.3, 0], steel);
+    box(root, [16, 1.05, 0.55], [0, 6.2, 0], steel);
+    const sign = label(
+      "V A L L E  /  M O T O R  P A R K",
+      15,
+      0.85,
+      "#f1ebdb",
+      "#344a43",
+    );
+    sign.position.set(0, 6.2, -0.29);
+    sign.rotation.y = Math.PI;
+    root.add(sign);
+    for (let i = 0; i < 6; i++) {
+      const s = this.layout.sample(this.startProgress + 0.02 + i * 0.012),
+        g = new THREE.Group();
+      g.position.set(s.x, this.terrain.getHeight(s.x, s.z) + 0.05, s.z);
+      g.rotation.y = Math.atan2(s.tx, s.tz);
+      for (const side of [-1, 1])
+        for (const z of [-0.9, 0.9])
+          box(g, [1.6, 0.008, 0.07], [side * 2.5, 0, z], material("#d8dacb"));
+      this.root.add(g);
+    }
+    for (const [distance, text] of [
+      [0.115, "150"],
+      [0.145, "100"],
+      [0.17, "50"],
+    ]) {
+      const s = this.layout.sample(distance),
+        x = s.x - s.nx * 8.8,
+        z = s.z - s.nz * 8.8;
+      const sign = label(text, 2, 1, "#233a32", "#e8e7d6");
+      sign.position.set(x, this.terrain.getHeight(x, z) + 1.2, z);
+      sign.rotation.y = Math.atan2(s.tx, s.tz) + Math.PI;
+      this.root.add(sign);
+    }
   }
-
-  addDebugPathLine() {
-    if (this.centerSamples.length < 2) return;
-    const points = this.centerSamples.map((point) => new THREE.Vector3(point.x, point.y + 0.12, point.z));
-    const line = new THREE.Line(
+  paddock() {
+    const road = box(
+      this.root,
+      [8, 0.05, 165],
+      [-18, this.terrain.getHeight(-18, -50) + 0.025, -50],
+      material("#7b8278"),
+    );
+    for (let i = 0; i < 5; i++) {
+      const z = -100 + i * 28;
+      placeAsset(
+        this.root,
+        "garage",
+        [-32, this.terrain.getHeight(-32, z), z],
+        20,
+        Math.PI / 2,
+      );
+    }
+    placeAsset(
+      this.root,
+      "office",
+      [-50, this.terrain.getHeight(-50, 20), 20],
+      26,
+      0,
+    );
+    placeAsset(
+      this.root,
+      "stand",
+      [-34, this.terrain.getHeight(-34, 68), 68],
+      45,
+      Math.PI / 2,
+    );
+    const bill = label(
+      "F I N D  Y O U R  L I N E",
+      19,
+      3,
+      "#efe8d8",
+      "#c45e40",
+    );
+    bill.position.set(38, this.terrain.getHeight(38, -190) + 3, -190);
+    this.root.add(bill);
+  }
+  buildGuide() {
+    const points = this.layout.samples.map(
+      (p) =>
+        new THREE.Vector3(p.x, this.terrain.getHeight(p.x, p.z) + 0.09, p.z),
+    );
+    points.push(points[0]);
+    this.guide = new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(points),
-      new THREE.LineBasicMaterial({
-        color: 0xff3b30,
-        depthTest: false,
-        depthWrite: false,
-      })
+      new THREE.LineDashedMaterial({
+        color: "#c9d9a9",
+        dashSize: 1.8,
+        gapSize: 3.4,
+        transparent: true,
+        opacity: 0.45,
+      }),
     );
-    line.renderOrder = 1000;
-    this.mesh.add(line);
+    this.guide.computeLineDistances();
+    this.root.add(this.guide);
   }
-
-  findNearestSampleIndex(position) {
-    let bestIndex = 0;
-    let bestDistSq = Number.POSITIVE_INFINITY;
-
-    for (let i = 0; i < this.centerSamples.length; i += 1) {
-      const point = this.centerSamples[i];
-      const dx = point.x - position.x;
-      const dz = point.z - position.z;
-      const distSq = dx * dx + dz * dz;
-      if (distSq < bestDistSq) {
-        bestDistSq = distSq;
-        bestIndex = i;
-      }
-    }
-
-    return bestIndex;
+  toggleGuide() {
+    this.guide.visible = !this.guide.visible;
+    return this.guide.visible;
   }
-
+  getSpawnPoint() {
+    const s = this.layout.sample(this.startProgress - 0.015);
+    return {
+      ...s,
+      y: this.terrain.getHeight(s.x, s.z) + 0.85,
+      yaw: Math.atan2(s.tx, s.tz),
+    };
+  }
+  getSurface(position) {
+    return this.layout.getSurface(position);
+  }
   getNormalizedProgress(position) {
-    const nearestIndex = this.findNearestSampleIndex(position);
-    const normalized = nearestIndex / Math.max(1, this.centerSamples.length - 1);
-    const now = performance.now();
-
-    if (now - this.lastProgressLogAt >= this.progressLogIntervalMs) {
-      this.lastProgressLogAt = now;
-      console.log('[Track:progress]', { position, nearestIndex, normalized });
-    }
-
-    return normalized;
+    return this.nearest(position).progress;
   }
-
-  getSpawnPoint(y = 0.65) {
-    const center = this.spawnCenter || this.gridToWorld(0, 0);
-    return { x: center.x, y, z: center.z };
+  nearest(position) {
+    const near = this.layout.nearest(position);
+    return {
+      ...near,
+      curveProgress: near.progress,
+      progress: (near.progress - this.startProgress + 1) % 1,
+    };
+  }
+  getStartPoint() {
+    return this.layout.sample(this.startProgress);
+  }
+  sampleAhead(near, distance) {
+    return this.layout.sample(near.curveProgress + distance / this.length);
+  }
+  getMapSamples() {
+    return this.layout.samples;
+  }
+  update(position) {
+    this.environment.update(position);
   }
 }
