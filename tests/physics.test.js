@@ -68,7 +68,10 @@ test("keyboard and controller steering both use the requested reversal", () => {
   assert.equal(mergeInputState({}, { steerAxis: 0.7 }).steerAxis, -0.7);
   assert.equal(mergeInputState({ left: true }, {}).steerAxis, 1);
   assert.equal(mergeInputState({}, { steerAxis: -0.7 }).steerAxis, 0.7);
-  assert.equal(mergeInputState({ right: true }, { steerAxis: 0.7 }).steerAxis, -1);
+  assert.equal(
+    mergeInputState({ right: true }, { steerAxis: 0.7 }).steerAxis,
+    -1,
+  );
 });
 test("right steering produces a right turn, left produces a left turn", () => {
   const a = rig(),
@@ -85,13 +88,13 @@ test("right steering produces a right turn, left produces a left turn", () => {
 });
 test("automatic shifting accelerates beyond first gear", () => {
   const r = rig();
-  r.run(6, throttle);
+  r.run(8, throttle);
   assert.ok(r.dynamics.powertrain.gear > 1);
   assert.ok(r.body.velocity.length() * 3.6 > 90);
 });
 test("braking overrides held throttle and stops the car", () => {
   const r = rig();
-  r.run(4, throttle);
+  r.run(5, throttle);
   const before = r.body.velocity.length();
   r.run(3, { ...throttle, brakeAxis: 1 });
   assert.ok(before > 15);
@@ -211,4 +214,22 @@ test("initial instrument state is complete before the first physics step", () =>
   assert.equal(s.surface, "asphalt");
   assert.ok(Number.isFinite(s.driveForce));
   assert.ok(Number.isFinite(s.engine.rpm));
+});
+
+test("front grip tuning increases front cornering force at the same speed and steering", () => {
+  const measure = (grip) => {
+    const model = new VehicleDynamics();
+    model.setTuning({ frontGrip: grip });
+    for (let i = 0; i < 120; i++)
+      model.compute(
+        { forward: 20, lateral: 0, yawRate: 0, grounded: true },
+        { steerAxis: 1, throttleAxis: 0, brakeAxis: 0 },
+        1 / 120,
+      );
+    return Math.abs(model.getState(20).frontLateralForce);
+  };
+  assert.ok(measure(1.15) > measure(1));
+  const model = new VehicleDynamics();
+  model.setTuning({ frontGrip: 99 });
+  assert.equal(model.getState(0).frontGrip, 1.45);
 });

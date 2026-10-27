@@ -30,6 +30,7 @@ export class VehicleDynamics {
       ["weightTransferLat", 0.05, 0.7],
       ["rearGripDrop", 0, 0.45],
       ["suspensionStiffness", 20, 50],
+      ["frontGrip", 0.85, 1.45],
     ])
       if (Number.isFinite(values[key]))
         this.tuning[key] = clamp(values[key], min, max);
@@ -98,7 +99,7 @@ export class VehicleDynamics {
       frontSlip,
       VEHICLE.frontCornering,
       frontLoad,
-      mu * loadSensitivity,
+      mu * loadSensitivity * this.tuning.frontGrip,
       frontBrake,
     );
     const r = axleForce(
@@ -157,6 +158,8 @@ export class VehicleDynamics {
       frontSlip,
       rearSlip,
       tireUsage: Math.max(f.usage, r.usage),
+      frontLateralForce: f.lateral,
+      rearLateralForce: r.lateral,
       steerAngle: angle,
       surface,
       grounded,
@@ -174,6 +177,7 @@ export class VehicleDynamics {
       ...this.debug,
       steer: this.steer,
       ...this.tuning,
+      enginePowerKw: VEHICLE.power / 1000,
       engine: this.powertrain.getState(speed),
     };
   }

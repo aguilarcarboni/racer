@@ -17,6 +17,7 @@ export class Hud {
       ["tuneWtLat", "valWtLat", "weightTransferLat"],
       ["tuneRearDrop", "valRearDrop", "rearGripDrop"],
       ["tuneSuspension", "valSuspension", "suspensionStiffness"],
+      ["tuneFrontGrip", "valFrontGrip", "frontGrip"],
     ];
     for (const [id, value, key] of controls) {
       $(id).addEventListener("input", (e) => {

@@ -25,7 +25,7 @@ Open http://127.0.0.1:5173. No menu blocks the first drive.
 | R         | Reset to the opening straight; retain the session best lap            |
 | Escape    | Pause / resume                                                        |
 
-Automatic gears are on initially. The guide is a centerline aid, not an optimized braking/racing line. Slow down before corners. Grass and gravel have lower grip and greater rolling resistance. Open Car setup to adjust brake bias, pitch response, cornering load, rear rotation and suspension firmness. The original four tuning settings remain available.
+Automatic gears are on initially. The guide is a centerline aid, not an optimized braking/racing line. Slow down before corners. Grass and gravel have lower grip and greater rolling resistance. Open Car setup to adjust brake bias, pitch response, cornering load, rear rotation, front tire grip and suspension firmness. The original four tuning settings remain available.
 
 A standard gamepad uses the left stick to steer, triggers to accelerate/brake, the top face button for camera, the left face button for handbrake, and bottom/right face buttons for shifting. Hardware controller acceptance is still pending.
 
@@ -72,8 +72,12 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 18 behavior tests, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 19 behavior tests, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 
 Browser console/error messages still mirror to the Vite terminal. Periodic `[Telemetry:periodic]` messages are JSON at 1.5 second intervals, with input-linked snapshots, grounded/wheel contacts, steering, forces and suspension lengths. See handoff.md for observed browser evidence and outstanding acceptance.
+
+## Current handling tune
+
+Engine power is capped at 140 kW (previously 210 kW), with peak drive force reduced to 4,800 N for gentler acceleration. Front grip defaults to 1.15 times the surface grip, and front cornering stiffness is 74,000 N/rad. Front tire grip is adjustable in Car setup. These are model parameters, not measured real-car specifications.

@@ -35,3 +35,9 @@ The user reported inverted keyboard steering and explicitly requested swapping A
 ## Controller playtest correction
 
 The user also reported inverted controller steering. Reversed the controller axis contribution at the shared InputState boundary to match the accepted keyboard reversal. Updated the existing mapping assertions for both stick directions and simultaneous keyboard/controller input. No tire or suspension parameters changed.
+
+## Lower-power / stronger-front playtest tune
+
+Requested less horsepower and more front grip. Engine power cap reduced from 210 to 140 kW, peak drive force from 8,600 to 4,800 N, front cornering stiffness from 68,000 to 74,000 N/rad, and a front-only grip multiplier defaults to 1.15. Front tire grip is exposed in Car setup with model-boundary clamping and diagnostics. The existing acceleration/braking checks now allow the slower warm-up; full-circuit and stability checks remain. Earlier acceleration measurements above describe the previous tune. Await user feedback before further handling changes.
+
+Matched-input headless check: five-second acceleration decreased from 92.95 to 69.23 km/h. At a fixed 72 km/h and full steering, modeled front lateral force increased from 3,942 to 4,339 N. All 19 tests and the build pass. These are simulation comparisons; acceptance of the new feel awaits the user.
