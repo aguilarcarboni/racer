@@ -40,6 +40,8 @@ export class Telemetry {
         surface: state.surface,
         enginePowerKw: state.enginePowerKw,
         frontGrip: state.frontGrip,
+        frontLateralLimit: Math.round(state.frontLateralLimit || 0),
+        rearLateralCapacity: Math.round(state.rearLateralCapacity || 0),
         rearLateralForce: Math.round(state.rearLateralForce || 0),
         frontBrakeForce: Math.round(state.frontBrakeForce || 0),
         rearBrakeForce: Math.round(state.rearBrakeForce || 0),

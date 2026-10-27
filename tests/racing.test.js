@@ -5,6 +5,7 @@ import { TrackLayout } from "../src/models/TrackLayout.js";
 import { RacingLineProfile } from "../src/racing/RacingLineProfile.js";
 import { AiDriver } from "../src/racing/AiDriver.js";
 import { RaceSession } from "../src/racing/RaceSession.js";
+import { DEFAULT_TUNE } from "../src/physics/VehicleConfig.js";
 import { LINE, OPPONENTS, RACE } from "../src/racing/RaceConfig.js";
 import { Terrain } from "../src/physics/Terrain.js";
 import { createChassis, applyDrive } from "../src/physics/Chassis.js";
@@ -88,8 +89,13 @@ test("straight speed recommendation exceeds the tight-corner recommendation", ()
   assert.ok(profile.getSpeed(0.08) > Math.min(...profile.limits) + 5);
 });
 test("guide accounts for front grip without claiming unlimited cornering capacity", () => {
-  assert.ok(profile.getSpeed(0.2, 0.85) < profile.getSpeed(0.2, 1.15));
-  assert.ok(profile.getSpeed(0.2, 1.45) <= profile.getSpeed(0.2, 1.15) * 1.05);
+  assert.ok(
+    profile.getSpeed(0.2, 0.85) < profile.getSpeed(0.2, DEFAULT_TUNE.frontGrip),
+  );
+  assert.ok(
+    profile.getSpeed(0.2, 1.45) <=
+      profile.getSpeed(0.2, DEFAULT_TUNE.frontGrip) * 1.05,
+  );
 });
 function stateAt(p, offset = 0, speed = 15) {
   const point = layout.sample(p);

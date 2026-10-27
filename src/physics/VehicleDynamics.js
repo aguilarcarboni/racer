@@ -30,6 +30,8 @@ export class VehicleDynamics {
       frontBrakeForce: 0,
       rearBrakeForce: 0,
       rearGripReserve: 1,
+      frontLateralLimit: 0,
+      rearLateralCapacity: 0,
     };
   }
   setTuning(values) {
@@ -118,13 +120,6 @@ export class VehicleDynamics {
       -rearMu * rearLoad * VEHICLE.brakeGripUse,
       rearMu * rearLoad * VEHICLE.brakeGripUse,
     );
-    const f = axleForce(
-      frontSlip,
-      VEHICLE.frontCornering,
-      frontLoad,
-      frontMu,
-      safeFrontBrake,
-    );
     const r = axleForce(
       rearSlip,
       VEHICLE.rearCornering,
@@ -135,6 +130,18 @@ export class VehicleDynamics {
         -rearMu * rearLoad * 0.82,
         rearMu * rearLoad * 0.82,
       ) + safeRearBrake,
+    );
+    const f = axleForce(
+      frontSlip,
+      VEHICLE.frontCornering,
+      frontLoad,
+      frontMu,
+      safeFrontBrake,
+      // Leave a little rear yaw-moment capacity in reserve as drive/braking
+      // consumes its grip. The sharper front can then turn in without a snap.
+      input.handbrake
+        ? Infinity
+        : ((r.lateralCapacity * VEHICLE.rearAxle) / VEHICLE.frontAxle) * 0.95,
     );
     const dynamicBlend = clamp((speed - 1) / 4, 0, 1);
     const lowLateral = clamp(
@@ -182,6 +189,8 @@ export class VehicleDynamics {
       rearSlip,
       tireUsage: Math.max(f.usage, r.usage),
       frontLateralForce: f.lateral,
+      frontLateralLimit: f.availableLateral,
+      rearLateralCapacity: r.lateralCapacity,
       frontBrakeForce: Math.abs(safeFrontBrake),
       rearBrakeForce: Math.abs(safeRearBrake),
       rearGripReserve:

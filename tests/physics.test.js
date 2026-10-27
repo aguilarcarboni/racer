@@ -123,6 +123,10 @@ test("tire forces stay within the combined friction circle", () => {
   const f = axleForce(0.5, 70000, 5500, 1.1, 4000);
   assert.ok(Math.hypot(f.longitudinal, f.lateral) <= 6050.0001);
   assert.ok(f.lateral < 0);
+  const balanced = axleForce(0.5, 88000, 5500, 1.1, 4000, 2000);
+  assert.ok(Math.abs(balanced.lateral) <= 2000);
+  assert.ok(Math.hypot(balanced.longitudinal, balanced.lateral) <= 6050.0001);
+  assert.ok(balanced.usage <= 1);
 });
 test("an airborne car gets no engine traction or yaw steering", () => {
   const d = new VehicleDynamics(),
@@ -299,4 +303,53 @@ test("five-second acceleration is about 20 percent quicker than the previous tun
   r.run(5, throttle);
   const speed = r.body.velocity.length() * 3.6;
   assert.ok(speed > 80 && speed < 86, `five-second speed: ${speed}`);
+});
+
+test("turn-in at 90 km/h is prompt without excessive sideslip", () => {
+  for (const direction of [-1, 1]) {
+    const r = rig();
+    r.body.velocity.z = 25;
+    let responseTime = null,
+      yawAt200ms = 0,
+      maxSlip = 0;
+    for (let i = 0; i < 240; i++) {
+      r.run(1 / 120, {
+        ...idle,
+        steerAxis: direction * 0.65,
+        throttleAxis: 0.25,
+      });
+      const yaw = r.body.angularVelocity.y * direction;
+      if (responseTime === null && yaw > 0.15) responseTime = (i + 1) / 120;
+      if (i === 23) yawAt200ms = yaw;
+      const v = r.body.vectorToLocalFrame(r.body.velocity);
+      maxSlip = Math.max(maxSlip, Math.abs(Math.atan2(v.x, v.z)));
+    }
+    assert.ok(
+      responseTime !== null && responseTime < 0.225,
+      `turn-in took ${responseTime} seconds`,
+    );
+    assert.ok(yawAt200ms > 0.145, `weak initial rotation: ${yawAt200ms}`);
+    assert.ok(
+      r.body.angularVelocity.y * direction > 0.215,
+      "the front must keep biting through the corner",
+    );
+    assert.ok(maxSlip < (3 * Math.PI) / 180);
+  }
+});
+test("quick left-right transitions stay planted on full throttle", () => {
+  for (const speed of [18, 25, 32]) {
+    const r = rig();
+    r.body.velocity.z = speed;
+    let maxSlip = 0;
+    for (let i = 0; i < 480; i++) {
+      const direction = Math.floor(i / 96) % 2 ? -1 : 1;
+      r.run(1 / 120, { ...throttle, steerAxis: direction });
+      const v = r.body.vectorToLocalFrame(r.body.velocity);
+      maxSlip = Math.max(maxSlip, Math.abs(Math.atan2(v.x, v.z)));
+    }
+    assert.ok(
+      maxSlip < (8 * Math.PI) / 180,
+      `transition sideslip at ${speed * 3.6} km/h: ${(maxSlip * 180) / Math.PI}`,
+    );
+  }
 });

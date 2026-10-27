@@ -13,13 +13,13 @@ export const VEHICLE = Object.freeze({
   rebound: 4.8,
   travel: 0.22,
   maxSuspensionForce: 16000,
-  frontCornering: 74000,
+  frontCornering: 88000,
   rearCornering: 88000,
   rearGrip: 1.14,
   brakeGripUse: 0.7,
   brakeSteerReduction: 0.35,
   maxSteer: 0.52,
-  steerResponse: 7,
+  steerResponse: 11,
   power: 168000,
   driveForce: 5760,
   brakeForce: 13800,
@@ -32,7 +32,7 @@ export const DEFAULT_TUNE = Object.freeze({
   weightTransferLat: 0.18,
   rearGripDrop: 0.06,
   suspensionStiffness: 32,
-  frontGrip: 1.15,
+  frontGrip: 1.2,
 });
 export const clamp = (x, a, b) =>
   Math.max(a, Math.min(b, Number.isFinite(x) ? x : a));
