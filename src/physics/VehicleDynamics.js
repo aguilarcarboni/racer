@@ -1,4 +1,10 @@
-import { VEHICLE, DEFAULT_TUNE, clamp, approach } from "./VehicleConfig.js";
+import {
+  VEHICLE,
+  DEFAULT_TUNE,
+  SURFACE_GRIP,
+  clamp,
+  approach,
+} from "./VehicleConfig.js";
 import { axleForce } from "./TireModel.js";
 import { PowertrainModel } from "./PowertrainModel.js";
 export class VehicleDynamics {
@@ -21,6 +27,9 @@ export class VehicleDynamics {
       steerAngle: 0,
       surface: "asphalt",
       grounded: false,
+      frontBrakeForce: 0,
+      rearBrakeForce: 0,
+      rearGripReserve: 1,
     };
   }
   setTuning(values) {
@@ -50,15 +59,15 @@ export class VehicleDynamics {
       VEHICLE.maxSteer,
       Math.atan((11.5 * VEHICLE.wheelbase) / (speed * speed + 25)),
     );
-    const angle = this.steer * steerLimit;
-    const mu =
-      surface === "asphalt"
-        ? 1.18
-        : surface === "curb"
-          ? 1.06
-          : surface === "gravel"
-            ? 0.68
-            : 0.48;
+    // Soften full-lock steering during hard braking at road speed. Keyboard
+    // drivers can keep turning without demanding a tightening radius as speed falls.
+    const brakeSteer =
+      1 -
+      controls.brake *
+        VEHICLE.brakeSteerReduction *
+        clamp((speed - 3) / 8, 0, 1);
+    const angle = this.steer * steerLimit * brakeSteer;
+    const mu = SURFACE_GRIP[surface] ?? SURFACE_GRIP.asphalt;
     const g = 9.81,
       mass = VEHICLE.mass;
     const longitudinalTransfer =
@@ -92,15 +101,29 @@ export class VehicleDynamics {
         0.1;
     const rearMu =
       mu *
+      VEHICLE.rearGrip *
       loadSensitivity *
       (1 - this.tuning.rearGripDrop * Math.abs(this.steer) * 0.18) *
       (input.handbrake ? 0.42 : 1);
+    const frontMu = mu * loadSensitivity * this.tuning.frontGrip;
+    // ABS-style force limits keep cornering grip available on both axles,
+    // especially at the rear when braking transfers load to the front.
+    const safeFrontBrake = clamp(
+      frontBrake,
+      -frontMu * frontLoad * VEHICLE.brakeGripUse,
+      frontMu * frontLoad * VEHICLE.brakeGripUse,
+    );
+    const safeRearBrake = clamp(
+      rearBrake,
+      -rearMu * rearLoad * VEHICLE.brakeGripUse,
+      rearMu * rearLoad * VEHICLE.brakeGripUse,
+    );
     const f = axleForce(
       frontSlip,
       VEHICLE.frontCornering,
       frontLoad,
-      mu * loadSensitivity * this.tuning.frontGrip,
-      frontBrake,
+      frontMu,
+      safeFrontBrake,
     );
     const r = axleForce(
       rearSlip,
@@ -111,7 +134,7 @@ export class VehicleDynamics {
         controls.drive,
         -rearMu * rearLoad * 0.82,
         rearMu * rearLoad * 0.82,
-      ) + rearBrake,
+      ) + safeRearBrake,
     );
     const dynamicBlend = clamp((speed - 1) / 4, 0, 1);
     const lowLateral = clamp(
@@ -143,7 +166,7 @@ export class VehicleDynamics {
     let fz =
       f.longitudinal +
       r.longitudinal -
-      f.lateral * Math.sin(angle) -
+      dynamicBlend * f.lateral * Math.sin(angle) -
       resistance;
     if (!grounded) {
       fx = 0;
@@ -159,6 +182,14 @@ export class VehicleDynamics {
       rearSlip,
       tireUsage: Math.max(f.usage, r.usage),
       frontLateralForce: f.lateral,
+      frontBrakeForce: Math.abs(safeFrontBrake),
+      rearBrakeForce: Math.abs(safeRearBrake),
+      rearGripReserve:
+        rearMu * rearLoad > 0
+          ? Math.sqrt(
+              Math.max(0, 1 - (r.longitudinal / (rearMu * rearLoad)) ** 2),
+            )
+          : 0,
       rearLateralForce: r.lateral,
       steerAngle: angle,
       surface,

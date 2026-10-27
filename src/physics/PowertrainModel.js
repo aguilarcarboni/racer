@@ -1,5 +1,4 @@
-import { VEHICLE, clamp } from "./VehicleConfig.js";
-const caps = [0, 15, 25, 36, 48, 62];
+import { VEHICLE, GEAR_SPEEDS as caps, clamp } from "./VehicleConfig.js";
 export class PowertrainModel {
   constructor() {
     this.reset();

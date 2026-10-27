@@ -7,7 +7,7 @@ export const RACE = Object.freeze({
 export const LINE = Object.freeze({
   lateralAcceleration: 7,
   brakingDeceleration: 6.5,
-  maxSpeed: 34,
+  maxSpeed: 40.8,
   minSpeed: 10.5,
   amberRatio: 0.94,
   redRatio: 1.05,

@@ -29,7 +29,7 @@ export class AiDriver {
     const speed = Math.max(0, state.speedForward);
     // Preview through the steering look-ahead so a short curvature dip cannot
     // trigger acceleration while the chassis is still turning into a corner.
-    const lookAhead = 8 + speed * 0.65;
+    let lookAhead = 8 + speed * 0.65;
     let targetSpeed =
       Math.min(
         ...[0, 0.5, 1].map((f) =>
@@ -47,11 +47,12 @@ export class AiDriver {
       if (gap < -this.layout.length / 2) gap += this.layout.length;
       return { gap, lane: point.signedDistance, speed: other.speedMps };
     });
+    const trafficLookAhead = Math.max(38, speed * 2.8);
     const isClear = (lane, margin = 1.9) =>
       !nearby.some(
         (other) =>
           other.gap > -9 &&
-          other.gap < 38 &&
+          other.gap < trafficLookAhead &&
           Math.abs(other.lane - lane) < margin,
       );
     this.passTime = Math.max(0, this.passTime - dt);
@@ -61,16 +62,16 @@ export class AiDriver {
       !nearby.some(
         (other) =>
           other.gap > -9 &&
-          other.gap < 38 &&
-          Math.abs(other.lane - this.baseLane) < 1.9,
+          other.gap < trafficLookAhead &&
+          Math.abs(other.lane - this.baseLane) < 3,
       )
     )
       targetLane = this.baseLane;
     const obstruction = nearby.some(
       (other) =>
         other.gap > 0 &&
-        other.gap < 38 &&
-        Math.abs(other.lane - targetLane) < 1.9,
+        other.gap < trafficLookAhead &&
+        Math.abs(other.lane - targetLane) < 3,
     );
     if (obstruction && this.passTime === 0) {
       const candidates = [-3.5, -1.5, 0.5, 2.5, 3.5].sort(
@@ -105,6 +106,14 @@ export class AiDriver {
     targetSpeed *=
       1 - Math.min(0.18, Math.abs(targetLane - near.signedDistance) * 0.06);
     this.lane = approach(this.lane, targetLane, 1.2, dt);
+    // Aim for passing room before a close obstacle, not beyond its bumper.
+    if (
+      speed < 5 &&
+      nearestGap < 20 &&
+      isClear(targetLane) &&
+      Math.abs(targetLane - near.signedDistance) > 0.5
+    )
+      lookAhead = Math.min(lookAhead, Math.max(3, nearestGap * 0.65));
     const ahead = this.layout.sample(
       near.progress + lookAhead / this.layout.length,
     );
@@ -131,7 +140,7 @@ export class AiDriver {
     this.stuckTime =
       state.speedMps < 0.5 &&
       (targetSpeed > 1 ||
-        (nearestGap < 7 && Math.abs(targetLane - near.signedDistance) > 1.3))
+        (nearestGap < 7 && Math.abs(targetLane - near.signedDistance) > 0.5))
         ? this.stuckTime + dt
         : 0;
     if (

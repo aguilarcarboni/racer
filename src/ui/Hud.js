@@ -40,7 +40,12 @@ export class Hud {
       ["tuneSuspension", "valSuspension", "suspensionStiffness"],
       ["tuneFrontGrip", "valFrontGrip", "frontGrip"],
     ];
+    const initial = car.getDebugState();
     for (const [id, value, key] of controls) {
+      $(id).value = initial[key];
+      $(value).textContent = initial[key].toFixed(
+        key === "suspensionStiffness" ? 0 : 2,
+      );
       $(id).addEventListener("input", (e) => {
         const tune = { [key]: Number(e.target.value) };
         car.setTuning(tune);

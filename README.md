@@ -38,6 +38,7 @@ The goal is approachable, believable arcade handling: progressive grip, useful b
 - Front/rear slip angles include yaw velocity at each axle. Smooth tire-force saturation and a combined friction circle limit lateral and longitudinal grip together.
 - Traction control reserves rear cornering grip under full throttle. The old separate target-yaw controller is removed; low-speed steering blends into the tire model.
 - Steering is smoothed and limited with speed. Keyboard and controller steering both follow the requested reversed mapping.
+- Braking reserves tire capacity for cornering on both axles, with gentler full-lock steering under hard braking. A stronger rear axle and reduced load-transfer sensitivity favor recoverable understeer over a sudden spin.
 - Brakes remain effective when throttle is held. Automatic shifting and brake-to-reverse make the default drive accessible, while manual shifting remains available.
 - Surface grip and drag change off the asphalt. Contact is required for tire traction, so throttle cannot steer or accelerate an airborne chassis through tire force.
 - Fixed 120 Hz physics; rendering follows model state. A hidden tab pauses. Long frame stalls are capped to avoid runaway catch-up, which can slow simulation under heavy load.
@@ -89,4 +90,6 @@ Browser console/error messages still mirror to the Vite terminal. Periodic `[Tel
 
 ## Current handling tune
 
-Engine power is capped at 140 kW (previously 210 kW), with peak drive force reduced to 4,800 N for gentler acceleration. Front grip defaults to 1.15 times the surface grip, and front cornering stiffness is 74,000 N/rad. Front tire grip is adjustable in Car setup. These are model parameters, not measured real-car specifications.
+Engine power is 168 kW and peak drive force is 5,760 N, both 20% above the previous tune. Forward gear speed ranges are also 20% higher. The matched five-second acceleration check rises from 69.23 to 83.27 km/h (+20.3%); this is not a claim that every lap is 20% faster.
+
+Front grip remains adjustable at a default multiplier of 1.15. Rear grip and cornering stiffness are stronger, default pitch/cornering load sensitivity is lower, and rear rotation is reduced. ABS-style force limits retain lateral grip while braking. Hard braking softens maximum steering at road speed to avoid a sudden tightening radius as the car slows. Tire-force limits and physical suspension still apply; handbrake slides and off-track grip loss remain possible. These are game-model parameters, not measured real-car specifications.

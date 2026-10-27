@@ -105,6 +105,10 @@ test("stationary steering cannot spin the car in place", () => {
   r.run(2, { ...idle, steerAxis: 1 });
   assert.ok(Math.abs(r.body.angularVelocity.y) < 0.005);
   assert.ok(Math.abs(r.body.position.x) < 0.02);
+  assert.ok(
+    Math.abs(r.body.position.z) < 0.02,
+    "steering alone must not propel the car",
+  );
 });
 test("grass scrubs more speed than asphalt", () => {
   const a = rig(),
@@ -232,4 +236,67 @@ test("front grip tuning increases front cornering force at the same speed and st
   const model = new VehicleDynamics();
   model.setTuning({ frontGrip: 99 });
   assert.equal(model.getState(0).frontGrip, 1.45);
+});
+
+test("full braking with full steering remains controllable from 65 to 115 km/h", () => {
+  for (const speed of [18, 25, 32])
+    for (const direction of [-1, 1]) {
+      const r = rig();
+      r.body.velocity.z = speed;
+      r.run(1, { ...idle, steerAxis: direction, throttleAxis: 0.25 });
+      let maxSlip = 0;
+      for (let i = 0; i < 480; i++) {
+        r.run(1 / 120, { ...idle, steerAxis: direction, brakeAxis: 1 });
+        const v = r.body.vectorToLocalFrame(r.body.velocity);
+        if (v.z > 5)
+          maxSlip = Math.max(maxSlip, Math.abs(Math.atan2(v.x, v.z)));
+      }
+      assert.ok(
+        maxSlip < (15 * Math.PI) / 180,
+        `spin while braking at ${speed * 3.6} km/h: ${(maxSlip * 180) / Math.PI} degrees`,
+      );
+    }
+});
+test("power and lift-off remain settled through a held corner", () => {
+  for (const speed of [18, 25, 32])
+    for (const pedal of [0, 1]) {
+      const r = rig();
+      r.body.velocity.z = speed;
+      let maxSlip = 0;
+      for (let i = 0; i < 600; i++) {
+        r.run(1 / 120, {
+          ...idle,
+          steerAxis: 1,
+          throttleAxis: i < 120 ? 0.25 : pedal,
+        });
+        const v = r.body.vectorToLocalFrame(r.body.velocity);
+        if (v.z > 5)
+          maxSlip = Math.max(maxSlip, Math.abs(Math.atan2(v.x, v.z)));
+      }
+      assert.ok(
+        maxSlip < (6 * Math.PI) / 180,
+        `mid-corner slip at ${speed * 3.6} km/h: ${(maxSlip * 180) / Math.PI}`,
+      );
+    }
+});
+test("braking retains rear cornering force even with a rearward setup", () => {
+  const model = new VehicleDynamics();
+  model.setTuning({ brakeBiasFront: 0.45, weightTransferLong: 0.6 });
+  model.lastAccel = -10;
+  for (let i = 0; i < 120; i++)
+    model.compute(
+      { forward: 25, lateral: 1, yawRate: 0.2, grounded: true },
+      { ...idle, steerAxis: 1, brakeAxis: 1 },
+      1 / 120,
+    );
+  const state = model.getState(25);
+  assert.ok(Math.abs(state.rearLateralForce) > 1000);
+  assert.ok(state.rearGripReserve > 0.7);
+  assert.ok(state.rearBrakeForce > 0);
+});
+test("five-second acceleration is about 20 percent quicker than the previous tune", () => {
+  const r = rig();
+  r.run(5, throttle);
+  const speed = r.body.velocity.length() * 3.6;
+  assert.ok(speed > 80 && speed < 86, `five-second speed: ${speed}`);
 });
