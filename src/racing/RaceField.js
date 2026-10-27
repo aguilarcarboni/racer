@@ -1,8 +1,9 @@
+import { DEFAULT_TUNE } from "../physics/VehicleConfig.js";
 import { Car } from "../models/Car.js";
 import { LapTracker } from "../models/LapTracker.js";
 import { AiDriver } from "./AiDriver.js";
 import { RaceSession } from "./RaceSession.js";
-import { OPPONENTS } from "./RaceConfig.js";
+import { OPPONENTS, createRaceParticipants } from "./RaceConfig.js";
 const idle = { steerAxis: 0, throttleAxis: 0, brakeAxis: 0, handbrake: false };
 
 export class RaceField {
@@ -33,17 +34,37 @@ export class RaceField {
         driver: new AiDriver(track.layout, track.lineProfile, config),
       });
     }
-    this.session = new RaceSession(
-      this.entries.map(({ id, name, color, slot, isPlayer }) => ({
-        id,
-        name,
-        color,
-        slot,
-        isPlayer,
-      })),
-      (type, data) => console.info(`[Race:${type}]`, data),
+    this.setPlayerCount(1);
+  }
+  setPlayerCount(count) {
+    const participants = createRaceParticipants(count);
+    const sharedTune = this.entries[0].car.getDebugState();
+    for (const participant of participants)
+      Object.assign(
+        this.entries.find((e) => e.id === participant.id),
+        participant,
+      );
+    for (const entry of this.entries)
+      entry.car.setTuning(entry.isPlayer ? sharedTune : DEFAULT_TUNE);
+    this.session = new RaceSession(participants, (type, data) =>
+      console.info(`[Race:${type}]`, data),
     );
+    for (const entry of this.entries) entry.laps.reset({ keepBest: false });
     this.reset();
+  }
+  getPhase() {
+    return this.session.phase;
+  }
+  startCountdown() {
+    if (this.session.phase === "ready") this.session.step(0, true);
+  }
+  getPlayers() {
+    return this.entries
+      .filter((e) => e.isPlayer)
+      .sort((a, b) => a.playerIndex - b.playerIndex);
+  }
+  setTuning(values) {
+    for (const entry of this.getPlayers()) entry.car.setTuning(values);
   }
   reset() {
     this.session.reset();
@@ -55,7 +76,13 @@ export class RaceField {
     }
   }
   updateControls(playerInput, dt) {
-    this.session.step(dt, playerInput.throttleAxis > 0.1);
+    const inputs = Array.isArray(playerInput) ? playerInput : [playerInput];
+    this.session.step(
+      dt,
+      this.getPlayers().some(
+        (e) => (inputs[e.playerIndex]?.throttleAxis ?? 0) > 0.1,
+      ),
+    );
     const running = ["racing", "finished"].includes(this.session.phase);
     const states = this.entries.map((e) => ({
       id: e.id,
@@ -67,7 +94,7 @@ export class RaceField {
       const input = !running
         ? idle
         : entry.isPlayer
-          ? playerInput
+          ? (inputs[entry.playerIndex] ?? idle)
           : entry.driver.getInput(
               state,
               states.filter((s) => s.id !== entry.id),
@@ -91,11 +118,10 @@ export class RaceField {
     }
   }
   syncVisuals(dt) {
-    for (const entry of this.entries)
-      if (!entry.isPlayer) entry.car.syncVisuals(dt);
+    for (const entry of this.entries) entry.car.syncVisuals(dt);
   }
-  getSnapshot() {
-    const result = this.session.getSnapshot();
+  getSnapshot(playerId) {
+    const result = this.session.getSnapshot(playerId);
     result.entries = result.entries.map((entry) => ({
       ...entry,
       position: this.entries.find((e) => e.id === entry.id).car.getPosition(),

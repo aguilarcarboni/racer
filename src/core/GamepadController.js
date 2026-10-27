@@ -1,60 +1,63 @@
-import * as THREE from 'three';
+import { clamp } from "../physics/VehicleConfig.js";
 
 export class GamepadController {
-  constructor() {
+  constructor({ listen = true, label = "P1", logger = console } = {}) {
+    this.label = label;
+    this.logger = logger;
     this.onReset = null;
     this.onToggleCamera = null;
     this.onShiftUp = null;
     this.onShiftDown = null;
+    this.onPause = null;
     this.onTelemetry = null;
-    this.lastStateSignature = '';
-    this.lastButtons = {
-      cameraToggle: false,
-      shiftUp: false,
-      shiftDown: false,
-    };
-
     this.deadzone = 0.12;
     this.triggerDeadzone = 0.05;
-    console.info('[Input:gamepad-init] Gamepad controller ready');
-
-    window.addEventListener('gamepadconnected', (event) => {
-      console.info('[Input:gamepad-connected]', {
-        index: event.gamepad.index,
-        id: event.gamepad.id,
-        mapping: event.gamepad.mapping,
-      });
-    });
-
-    window.addEventListener('gamepaddisconnected', (event) => {
-      console.warn('[Input:gamepad-disconnected]', {
-        index: event.gamepad.index,
-        id: event.gamepad.id,
-      });
-    });
-  }
-
-  getState() {
-    const gamepad = this.getPrimaryGamepad();
-    if (!gamepad) {
-      this.emitStateChangeIfNeeded(this.getIdleState());
-      return this.getIdleState();
+    this.lastStateSignature = "";
+    this.lastButtons = {};
+    if (listen && typeof window !== "undefined") {
+      window.addEventListener("gamepadconnected", (e) =>
+        logger.info("[Input:gamepad-connected]", {
+          index: e.gamepad.index,
+          id: e.gamepad.id,
+          mapping: e.gamepad.mapping,
+        }),
+      );
+      window.addEventListener("gamepaddisconnected", (e) =>
+        logger.warn("[Input:gamepad-disconnected]", {
+          index: e.gamepad.index,
+          id: e.gamepad.id,
+        }),
+      );
     }
-
-    const rawSteer = this.readAxis(gamepad, 0);
-    const steer = this.applyDeadzone(rawSteer, this.deadzone);
-    const leftStickY = this.readAxis(gamepad, 1);
-    const leftStickThrottle = this.applyDeadzone(-leftStickY, this.deadzone);
-    const triggerThrottle = this.readTrigger(gamepad, 7);
-    const triggerBrake = this.readTrigger(gamepad, 6);
-
-    const throttle = THREE.MathUtils.clamp(Math.max(leftStickThrottle, triggerThrottle), 0, 1);
-    const brake = THREE.MathUtils.clamp(triggerBrake, 0, 1);
-
+  }
+  prime(gamepad) {
+    this.lastButtons = this.readButtons(gamepad);
+  }
+  getState(
+    gamepad = this.getPrimaryGamepad(),
+    { actionsEnabled = true, pauseEnabled = true } = {},
+  ) {
+    if (!gamepad?.connected) {
+      this.lastButtons = {};
+      const state = this.getIdleState();
+      this.emitStateChangeIfNeeded(state);
+      return state;
+    }
+    const steer = this.applyDeadzone(this.readAxis(gamepad, 0), this.deadzone);
+    const throttle = clamp(
+      Math.max(
+        this.applyDeadzone(-this.readAxis(gamepad, 1), this.deadzone),
+        this.readTrigger(gamepad, 7),
+      ),
+      0,
+      1,
+    );
+    const brake = this.readTrigger(gamepad, 6);
     const state = {
       connected: true,
-      source: 'gamepad',
-      handbrake: Boolean(gamepad.buttons?.[2]?.pressed),
+      source: "gamepad",
+      gamepadIndex: gamepad.index,
+      handbrake: !!gamepad.buttons?.[2]?.pressed,
       forward: throttle > 0.08,
       backward: brake > 0.08,
       left: steer < -0.08,
@@ -63,108 +66,72 @@ export class GamepadController {
       throttleAxis: throttle,
       brakeAxis: brake,
     };
-
-    this.handleResetButton(gamepad, state);
+    const buttons = this.readButtons(gamepad);
+    for (const [key, callback] of [
+      ["cameraToggle", "onToggleCamera"],
+      ["shiftUp", "onShiftUp"],
+      ["shiftDown", "onShiftDown"],
+      ["pause", "onPause"],
+    ]) {
+      const enabled = key === "pause" ? pauseEnabled : actionsEnabled;
+      if (enabled && buttons[key] && !this.lastButtons[key]) this[callback]?.();
+    }
+    this.lastButtons = buttons;
     this.emitStateChangeIfNeeded(state);
     return state;
   }
-
+  readButtons(pad) {
+    return {
+      cameraToggle: !!pad?.buttons?.[3]?.pressed,
+      shiftUp: !!pad?.buttons?.[0]?.pressed,
+      shiftDown: !!pad?.buttons?.[1]?.pressed,
+      pause: !!pad?.buttons?.[9]?.pressed,
+    };
+  }
   getPrimaryGamepad() {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const pad of pads) {
-      if (pad && pad.connected) return pad;
-    }
-    return null;
+    const pads = globalThis.navigator?.getGamepads?.() ?? [];
+    return Array.from(pads).find((p) => p?.connected) ?? null;
   }
-
-  readAxis(gamepad, index) {
-    if (!gamepad.axes || typeof gamepad.axes[index] !== 'number') return 0;
-    return THREE.MathUtils.clamp(gamepad.axes[index], -1, 1);
+  readAxis(pad, index) {
+    return clamp(pad.axes?.[index] ?? 0, -1, 1);
   }
-
-  readTrigger(gamepad, index) {
-    if (!gamepad.buttons || !gamepad.buttons[index]) return 0;
-    const value = THREE.MathUtils.clamp(gamepad.buttons[index].value ?? 0, 0, 1);
+  readTrigger(pad, index) {
+    const value = clamp(pad.buttons?.[index]?.value ?? 0, 0, 1);
     return value < this.triggerDeadzone ? 0 : value;
   }
-
   applyDeadzone(value, deadzone) {
     const abs = Math.abs(value);
-    if (abs <= deadzone) return 0;
-    const normalized = (abs - deadzone) / (1 - deadzone);
-    return Math.sign(value) * normalized;
+    return abs <= deadzone
+      ? 0
+      : (Math.sign(value) * (abs - deadzone)) / (1 - deadzone);
   }
-
-  handleResetButton(gamepad, state) {
-    const cameraTogglePressed = Boolean(gamepad.buttons?.[3]?.pressed);
-    const shiftUpPressed = Boolean(gamepad.buttons?.[0]?.pressed);
-    const shiftDownPressed = Boolean(gamepad.buttons?.[1]?.pressed);
-
-    if (cameraTogglePressed && !this.lastButtons.cameraToggle && this.onToggleCamera) {
-      this.onToggleCamera();
-      if (this.onTelemetry) {
-        this.onTelemetry({
-          event: 'gamepad-camera-toggle',
-          key: 'button-triangle',
-          state,
-        });
-      }
-    }
-
-    if (shiftUpPressed && !this.lastButtons.shiftUp && this.onShiftUp) {
-      this.onShiftUp();
-      if (this.onTelemetry) {
-        this.onTelemetry({
-          event: 'gamepad-shift-up',
-          key: 'button-x',
-          state,
-        });
-      }
-    }
-
-    if (shiftDownPressed && !this.lastButtons.shiftDown && this.onShiftDown) {
-      this.onShiftDown();
-      if (this.onTelemetry) {
-        this.onTelemetry({
-          event: 'gamepad-shift-down',
-          key: 'button-circle',
-          state,
-        });
-      }
-    }
-    this.lastButtons.cameraToggle = cameraTogglePressed;
-    this.lastButtons.shiftUp = shiftUpPressed;
-    this.lastButtons.shiftDown = shiftDownPressed;
-  }
-
   emitStateChangeIfNeeded(state) {
     const signature = [
-      state.connected ? 1 : 0,
-      state.forward ? 1 : 0,
-      state.backward ? 1 : 0,
-      state.left ? 1 : 0,
-      state.right ? 1 : 0,
+      state.connected,
+      state.gamepadIndex,
       state.steerAxis.toFixed(2),
       state.throttleAxis.toFixed(2),
       state.brakeAxis.toFixed(2),
-    ].join('|');
-
+      state.handbrake,
+    ].join("|");
     if (signature === this.lastStateSignature) return;
     this.lastStateSignature = signature;
-    console.log('[Input:gamepad-state-change]', state);
-    if (this.onTelemetry) {
-      this.onTelemetry({
-        event: 'gamepad-state-change',
-        key: 'analog',
-        state,
-      });
-    }
+    this.logger.info("[Input:gamepad-state-change]", {
+      player: this.label,
+      ...state,
+    });
+    this.onTelemetry?.({
+      event: "gamepad-state-change",
+      key: "analog",
+      player: this.label,
+      state,
+    });
   }
-
   getIdleState() {
     return {
       connected: false,
-      source: 'gamepad',
+      source: "gamepad",
+      handbrake: false,
       forward: false,
       backward: false,
       left: false,

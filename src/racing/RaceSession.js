@@ -38,10 +38,16 @@ export class RaceSession {
     if (entry.finishedAt === null && lap.laps >= RACE.laps) {
       entry.finishedAt = this.elapsed;
       this.onEvent("finish", { id, time: this.elapsed });
-      if (entry.isPlayer) this.phase = "finished";
+      if (
+        entry.isPlayer &&
+        this.standings
+          .filter((e) => e.isPlayer)
+          .every((e) => e.finishedAt !== null)
+      )
+        this.phase = "finished";
     }
   }
-  getSnapshot() {
+  getSnapshot(playerId) {
     const entries = this.standings
       .slice()
       .sort((a, b) => {
@@ -58,7 +64,9 @@ export class RaceSession {
       elapsed: this.elapsed,
       laps: RACE.laps,
       total: entries.length,
-      position: entries.find((e) => e.isPlayer)?.rank ?? 1,
+      position:
+        entries.find((e) => (playerId ? e.id === playerId : e.isPlayer))
+          ?.rank ?? 1,
       entries,
     };
   }

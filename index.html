@@ -22,7 +22,8 @@
       >
       <div class="session-name"><i></i> CLUB RACE <span>01 / VALLE</span></div>
       <div class="header-actions">
-        <button id="camera">View <kbd>C</kbd></button
+        <button id="local-race">Local race <kbd>1-4</kbd></button
+        ><button id="camera">View <kbd>C</kbd></button
         ><button id="pause">Pause <kbd>ESC</kbd></button>
       </div>
     </header>
@@ -208,8 +209,70 @@
       <h2>Take a breath.</h2>
       <button id="resume">Back to the track <kbd>ESC</kbd></button>
     </div>
+    <div id="split-hud" hidden></div>
+    <section
+      id="local-lobby"
+      class="local-lobby"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="local-title"
+      hidden
+    >
+      <div class="lobby-panel">
+        <div class="lobby-eyebrow">
+          <span>LOCAL MULTIPLAYER</span><b id="local-ready">0 / 2 READY</b>
+        </div>
+        <h2 id="local-title" tabindex="-1">Couch rivals.</h2>
+        <p class="lobby-intro">
+          One circuit. Up to four racers. Press <kbd>A / Cross</kbd> on each
+          controller to join.
+        </p>
+        <div class="lobby-settings">
+          <div class="lobby-count" aria-label="Number of local players">
+            <span>PLAYERS</span
+            ><button data-player-count="2" aria-pressed="true">2</button
+            ><button data-player-count="3" aria-pressed="false">3</button
+            ><button data-player-count="4" aria-pressed="false">4</button>
+          </div>
+          <label id="orientation-field"
+            >TWO-PLAYER LAYOUT<select id="split-orientation">
+              <option value="side">Side by side</option>
+              <option value="stacked">Top and bottom</option>
+            </select></label
+          >
+        </div>
+        <label class="keyboard-option"
+          ><input id="keyboard-player-one" type="checkbox" />Use keyboard for
+          Player 1</label
+        >
+        <div
+          id="controller-slots"
+          class="controller-slots"
+          aria-live="polite"
+        ></div>
+        <p id="local-message" class="local-message" role="status"></p>
+        <div class="lobby-controls">
+          <span>LEFT STICK <b>Steer</b></span
+          ><span>LT / RT <b>Brake / throttle</b></span
+          ><span>Y / TRIANGLE <b>Camera</b></span
+          ><span>START / OPTIONS <b>Pause</b></span>
+        </div>
+        <p class="lobby-note">
+          Unused grid spots race as AI. When everyone is ready, press Start /
+          Options to race. Changing this setup starts a fresh race.
+        </p>
+        <div class="lobby-actions">
+          <button id="local-solo">Back to solo</button
+          ><button id="local-preview">View grid</button
+          ><button id="local-start" disabled>Start local race</button>
+        </div>
+      </div>
+    </section>
     <footer>
-      <span><kbd>W / S</kbd> Throttle / brake & reverse</span
+      <span class="local-controls"
+        >Left stick steer &nbsp; / &nbsp; LT / RT pedals &nbsp; / &nbsp; Start
+        pause &nbsp; / &nbsp; Y camera</span
+      ><span><kbd>W / S</kbd> Throttle / brake & reverse</span
       ><span><kbd>A / D</kbd> Steer</span><span><kbd>SPACE</kbd> Handbrake</span
       ><span><kbd>&uarr; / &darr;</kbd> Manual shift</span
       ><button id="reset">Restart race <kbd>R</kbd></button

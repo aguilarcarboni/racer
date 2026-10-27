@@ -3,7 +3,8 @@ export class LapTracker {
     this.best = null;
     this.reset();
   }
-  reset() {
+  reset({ keepBest = true } = {}) {
+    if (!keepBest) this.best = null;
     this.time = 0;
     this.started = false;
     this.lapStart = 0;

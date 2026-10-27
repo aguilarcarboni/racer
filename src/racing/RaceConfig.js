@@ -25,3 +25,17 @@ export const OPPONENTS = Object.freeze([
     lane: 1.8,
   },
 ]);
+
+export function createRaceParticipants(count = 1) {
+  count = Math.max(1, Math.min(4, Math.round(Number(count) || 1)));
+  const grid = [
+    { id: "you", name: "YOU", color: "#dd542f", slot: 2 },
+    ...OPPONENTS,
+  ];
+  return grid.map((entry, i) => ({
+    ...entry,
+    isPlayer: i < count,
+    playerIndex: i < count ? i : null,
+    name: i < count ? (count === 1 ? "YOU" : `PLAYER ${i + 1}`) : entry.name,
+  }));
+}

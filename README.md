@@ -27,7 +27,31 @@ Open http://127.0.0.1:5173. Press throttle to begin a three-second countdown, th
 
 Automatic gears are on initially. The arrow guide follows the center of the road. Its color compares your actual speed with a curvature-based cornering and braking envelope: green means comfortable, amber means ease off, red means brake. Slowing down turns it green again. Each section previews its own speed requirement, so a corner can be red while the straight remains green. It is a driving aid rather than a fully optimized racing trajectory. Grass and gravel have lower grip and greater rolling resistance. Open Car setup to adjust brake bias, pitch response, cornering load, rear rotation, front tire grip and suspension firmness. The original four tuning settings remain available.
 
-A standard gamepad uses the left stick to steer, triggers to accelerate/brake, the top face button for camera, the left face button for handbrake, and bottom/right face buttons for shifting. Hardware controller acceptance is still pending.
+A standard gamepad uses the left stick to steer, triggers to accelerate/brake, the top face button for camera, the left face button for handbrake, and bottom/right face buttons for shifting. Start / Options pauses or resumes the shared race. Four-physical-controller acceptance is still pending; automated coverage uses independent controller snapshots and the physical car model.
+
+## Local split screen
+
+Open **Local race**, choose **2, 3 or 4 players**, and press **A / Cross** on each controller to claim a player. Once every slot is ready, click **Start local race** or press **Start / Options** for the countdown. Solo remains the default; **Back to solo** returns to its full-screen race. **View grid** previews the layout while waiting for controllers and keeps the cars parked.
+
+Two players can choose side-by-side or top-and-bottom views. Three players get three equal quadrants plus a shared map/standings panel; four players get four equal quadrants. Each player has their own camera, speed, gear, lap timer, position and speed-sensitive line. Y / Triangle changes only that player's camera. A first-person player's car remains visible to everyone else.
+
+| Controller            | Action                                                               |
+| --------------------- | -------------------------------------------------------------------- |
+| Left stick            | Steer                                                                |
+| RT / R2               | Throttle                                                             |
+| LT / L2               | Brake; hold at rest to reverse                                       |
+| X / Square            | Handbrake                                                            |
+| Y / Triangle          | Chase / hood / circuit camera for your view                          |
+| Start / Options       | Start from the ready lobby; pause/resume during a race               |
+| A / Cross, B / Circle | Manual up/down shifts during play; joining is ignored by the gearbox |
+
+**Use keyboard for Player 1** allows a mixed keyboard/controller game. Otherwise each local player needs a separate controller. Spare grid spots stay AI-controlled: two humans race two AI, three race one AI, and four race each other. The host's car setup is shared by local humans; AI retains its default setup. Changing player count or keyboard assignment starts a fresh race. Layout changes preserve the race. The race stays active until every human finishes three laps, with individual finish order retained.
+
+A disconnected controller neutralizes that player's input and pauses the whole local race. Reconnect it, or press A / Cross on a replacement; other players keep their assignments. Press Start / Options or Resume race after everyone is ready. A held Start button on reconnection does not silently resume.
+
+Focus the game and press a controller button if the browser has not exposed it yet. Device assignments retain the browser's gamepad indices, including sparse indices and identical controller names, following the [Gamepad API guidance](https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API/Using_the_Gamepad_API).
+
+Rendering uses one shared scene, one physics world and one WebGL renderer, with independent cameras and [scissored viewports](https://threejs.org/manual/pages/multiple-scenes.html). The local-mode pixel ratio is capped at 1.25 to contain GPU work (solo: 1.75). Four real controllers and their hardware/browser performance still need a group playtest.
 
 ## Driving model
 
@@ -43,7 +67,7 @@ The goal is approachable, believable arcade handling: progressive grip, useful b
 - Surface grip and drag change off the asphalt. Contact is required for tire traction, so throttle cannot steer or accelerate an airborne chassis through tire force.
 - Fixed 120 Hz physics; rendering follows model state. A hidden tab pauses. Long frame stalls are capped to avoid runaway catch-up, which can slow simulation under heavy load.
 
-This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model, multiplayer or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
+This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model, online multiplayer or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
 
 ## Club race
 
@@ -54,6 +78,10 @@ The lap timer starts at the gantry. Ordered quarter-lap checkpoints prevent a sh
 ## Code map
 
 - `src/core/Game.js`: lifecycle, fixed-step order, input orchestration, camera, pause.
+- `src/core/GamepadAssignments.js`, `LocalControllers.js`: stable controller slots, join, reconnect and per-player input.
+- `src/core/LocalRaceGate.js`: parked preview, missing-controller and pause gates.
+- `src/view/PlayerCamera.js`, `SplitScreenRenderer.js`: per-player cameras, logical viewports and per-view line state.
+- `src/ui/LocalLobby.js`, `SplitHud.js`: controller lobby, layouts and individual instruments.
 - `src/core/InputState.js`: shared keyboard/controller input mapping.
 - `src/core/Telemetry.js`: event and throttled JSON driving telemetry.
 - `src/models/Car.js`: chassis/dynamics/view composition and public vehicle API.
@@ -82,7 +110,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 60 behavior tests, including controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

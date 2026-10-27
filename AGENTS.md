@@ -18,6 +18,10 @@ Goals:
 - `src/main.js`: logger and app entry point.
 - `src/core/Game.js`: orchestration, fixed 120 Hz update order, camera, pause and lifecycle.
 - `src/core/InputController.js`, `GamepadController.js`, `InputState.js`: input collection and consistent signs.
+- `src/core/GamepadAssignments.js`, `LocalControllers.js`: stable gamepad-index slots and isolated player inputs/actions.
+- `src/core/LocalRaceGate.js`: finite parked-grid settling and controller/pause race gates.
+- `src/view/PlayerCamera.js`, `SplitScreenRenderer.js`: one camera per player and logical-pixel viewport/scissor rendering.
+- `src/ui/LocalLobby.js`, `SplitHud.js`: local joining, layout choices and per-view UI.
 - `src/core/Telemetry.js`, `TerminalLogger.js`: event/throttled JSON telemetry and browser-to-terminal bridge.
 - `src/models/Car.js`: chassis, dynamics and view composition; public vehicle API.
 - `src/physics/VehicleDynamics.js`, `TireModel.js`, `PowertrainModel.js`, `VehicleConfig.js`: vehicle behavior and validated configuration.
@@ -56,6 +60,7 @@ High-value log streams:
 - `[Input:key-down]`, `[Input:key-up]` and event-linked `[Input:telemetry]`
 - `[Telemetry:periodic]`: JSON every 1.5 seconds, including speed, surface, forces, grounded wheel count and suspension lengths
 - `[Tune:update]`, `[Tune:transmission]`, `[Camera:mode]`, `[Game:pause]`, `[Game:reset]`
+- `[Local:players]`, `[Local:join]`, `[Local:disconnect]`, `[Input:gamepad-bound]`: player/device assignment lifecycle.
 - `[Race:phase]`, `[Race:finish]`: countdown/start and finish classification events.
 - `[Track:create]`, `[Car:model-ready]` and startup/runtime errors
 
@@ -265,3 +270,13 @@ For wheel animation, keep steering above spin in the transform hierarchy and rot
 For braking stability, cap brake force against each axle's current grip capacity so rear unloading cannot remove all lateral grip. Hard-braking steering assistance is speed dependent; keep the default full-lock brake/corner and power/lift-off behavior tests. Apply speed/handling changes to the physical opponents too, and recheck the multi-car passing test before release. Do not describe an acceleration comparison as a guaranteed lap-time gain.
 
 For responsive steering, keep axle-force balance separate from input response. The front tire force may be bounded by the rear axle's remaining lateral capacity and axle lever arms; the handbrake bypasses that balance aid. Do not reintroduce a direct target-yaw controller or remove the braking/power-on guards to improve turn-in. Verify both the response-time check and quick left/right transitions after front-grip or steering changes.
+
+## Local multiplayer contract
+
+Solo remains keyboard + first pad. Local mode requires one unique controller per human unless keyboard P1 is explicitly selected. Join by bottom face-button edge, preserve original browser gamepad indices (including sparse arrays and equal IDs), and prime held buttons on join/reconnect so A does not change gear and held Start cannot resume. A missing pad must never silently control another car. Any local disconnect pauses the whole running race and neutralizes missing input.
+
+RaceField promotes its existing cars to human slots and fills only unused places with AI. Local humans inherit the host setup; solo AI retains defaults. Finish classification must wait for all human players while preserving individual finish times. R restarts the race; mode/input changes start a fresh race. Keep simulation ordering shared at 120 Hz.
+
+Use one WebGL renderer/world. Set each camera aspect and matching viewport/scissor in logical pixels, convert top-origin UI rectangles to bottom-origin WebGL coordinates, and restore the renderer state after the pass. Restore the owning car's visibility after hood rendering so others still see it. Update guide colors and lighting from the player for each viewport. Never multiply the physics step by the number of views. The parked preview settles for a bounded interval, then freezes until all players are ready; a live race cannot advance through setup, pause or missing-controller states.
+
+Controller tests use injected snapshots, including a four-body physical input-isolation test. Keep this distinct from an actual four-controller hardware/browser acceptance claim.

@@ -13,6 +13,8 @@ export class Hud {
   bindRace(race) {
     const body = $("standings-body"),
       dots = $("map-opponents");
+    body.replaceChildren();
+    dots.replaceChildren();
     for (const entry of race.entries) {
       const row = document.createElement("div");
       row.className = "standing-row";

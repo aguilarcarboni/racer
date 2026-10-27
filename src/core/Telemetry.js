@@ -7,6 +7,7 @@ export class Telemetry {
       "[Input:telemetry]",
       JSON.stringify({
         event: event.event,
+        player: event.player ?? "P1",
         key: event.key,
         inputState: event.state,
         speedKmh: Math.round(state.speedMps * 36) / 10,
@@ -15,7 +16,7 @@ export class Telemetry {
       }),
     );
   }
-  update(time, state, progress, race, advice, hoodCamera) {
+  update(time, state, progress, race, advice, hoodCamera, localPlayers) {
     if (time - this.last < 1.5) return;
     this.last = time;
     console.info(
@@ -31,6 +32,7 @@ export class Telemetry {
         lineStatus: advice?.level,
         lineTargetKmh: advice ? Math.round(advice.targetSpeed * 3.6) : null,
         hoodCamera,
+        localPlayers,
         gear: state.gear,
         steer: +state.steer.toFixed(3),
         driveForce: +state.driveForce.toFixed(0),
