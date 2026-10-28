@@ -1,3 +1,4 @@
+import { TrackBroadphase } from "../physics/TrackBroadphase.js";
 import * as C from "cannon-es";
 import { PhysicsCar } from "../physics/PhysicsCar.js";
 import { TrackLayout } from "../models/TrackLayout.js";
@@ -20,7 +21,7 @@ import { IDLE_INPUT, ONLINE } from "../online/Protocol.js";
 export class RaceSimulation {
   constructor() {
     this.world = new C.World({ gravity: new C.Vec3(0, -9.81, 0) });
-    this.world.broadphase = new C.SAPBroadphase(this.world);
+    this.world.broadphase = new TrackBroadphase(this.world);
     this.world.solver.iterations = 12;
     this.layout = new TrackLayout();
     this.terrain = new Terrain();

@@ -1,4 +1,5 @@
 import { WebSocketServer } from "ws";
+import { packRoom } from "../online/SnapshotCodec.js";
 import { cleanInput } from "../online/Protocol.js";
 export class RealtimeHub {
   constructor(service, store, { allowedOrigins = [] } = {}) {
@@ -7,6 +8,7 @@ export class RealtimeHub {
     this.allowedOrigins = allowedOrigins;
     this.peers = new Set();
     this.busy = false;
+    this.lobbySentAt = new Map();
     this.sockets = new WebSocketServer({
       noServer: true,
       maxPayload: 4096,
@@ -57,6 +59,7 @@ export class RealtimeHub {
         const message = JSON.parse(raw.toString());
         if (!peer.member) {
           if (message.type !== "auth") throw new Error("Session required");
+          peer.protocol = message.protocol === 2 ? 2 : 1;
           peer.member = await this.service.authenticate(message.code, message);
           peer.code = message.code;
           clearTimeout(authTimeout);
@@ -87,7 +90,11 @@ export class RealtimeHub {
           )
             socket.close(1008, "Session ended");
         } else if (message.type === "ping")
-          this.send(peer, { type: "pong", at: message.at });
+          this.send(peer, {
+            type: "pong",
+            at: message.at,
+            serverTime: Date.now(),
+          });
       } catch {
         socket.close(1008, "Invalid session or update");
       }
@@ -109,8 +116,14 @@ export class RealtimeHub {
     socket.on("error", () => socket.close());
   }
   send(peer, value) {
-    if (peer.socket.readyState === 1 && peer.socket.bufferedAmount < 256000)
-      peer.socket.send(JSON.stringify(value));
+    if (peer.socket.readyState === 1 && peer.socket.bufferedAmount < 16000)
+      peer.socket.send(
+        JSON.stringify(
+          value.type === "state" && peer.protocol === 2
+            ? { type: "frame", room: packRoom(value.room) }
+            : value,
+        ),
+      );
   }
   async broadcast() {
     if (this.busy || !this.peers.size) return;
@@ -126,6 +139,15 @@ export class RealtimeHub {
             if (peer.code === code) peer.socket.close(1008, "Lobby expired");
           continue;
         }
+        if (
+          !row.room.sim &&
+          Date.now() - (this.lobbySentAt.get(code) ?? 0) < 500
+        )
+          continue;
+        this.lobbySentAt.set(code, Date.now());
+        const snapshot = row.room.sim
+          ? this.service.simulation.snapshot(row.room.sim)
+          : null;
         for (const peer of this.peers)
           if (peer.code === code && peer.member) {
             if (
@@ -137,7 +159,12 @@ export class RealtimeHub {
             this.send(peer, {
               type: "state",
               room: {
-                ...this.service.view(row.room, peer.member, Date.now()),
+                ...this.service.view(
+                  row.room,
+                  peer.member,
+                  Date.now(),
+                  snapshot,
+                ),
                 revision: row.revision,
               },
             });
@@ -147,16 +174,25 @@ export class RealtimeHub {
       console.error("[Online:stream-error]", error.message);
     } finally {
       this.busy = false;
+      this.tickSamples ??= [];
+      this.tickSamples.push(performance.now() - started);
       if (performance.now() - (this.lastTelemetry ?? 0) > 3000) {
         this.lastTelemetry = performance.now();
         console.info("[Online:stream]", {
           peers: this.peers.size,
           tickMs: Math.round(performance.now() - started),
+          p95TickMs: Math.round(
+            this.tickSamples.slice().sort((a, b) => a - b)[
+              Math.floor(this.tickSamples.length * 0.95)
+            ],
+          ),
+          maxTickMs: Math.round(Math.max(...this.tickSamples)),
           maxBufferedBytes: Math.max(
             0,
             ...[...this.peers].map((p) => p.socket.bufferedAmount),
           ),
         });
+        this.tickSamples = [];
       }
     }
   }

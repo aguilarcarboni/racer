@@ -1,3 +1,4 @@
+import { unpackRoom } from "./SnapshotCodec.js";
 import { ONLINE, IDLE_INPUT, cleanInput } from "./Protocol.js";
 import { onlineServerUrl } from "./ServerConfig.js";
 export class OnlineClient {
@@ -76,7 +77,10 @@ export class OnlineClient {
     if (result.data.revision < this.revision) return;
     this.revision = result.data.revision;
     this.room = result.data;
-    this.onStatus?.("connected");
+    if (this.connectionStatus !== "connected") {
+      this.connectionStatus = "connected";
+      this.onStatus?.("connected");
+    }
     this.onRoom?.(result.data, result);
   }
   async connect(action, name, code = "") {
@@ -143,7 +147,7 @@ export class OnlineClient {
       : this.room?.snapshot
         ? ONLINE.inputMs
         : ONLINE.lobbyMs;
-    if (this.streaming && this.room?.snapshot) {
+    if (this.streaming) {
       this.timer = setTimeout(() => this.poll(generation), ONLINE.lobbyMs);
       return;
     }
@@ -183,18 +187,23 @@ export class OnlineClient {
         return;
       }
       socket.send(
-        JSON.stringify({ type: "auth", ...this.session, device: this.device }),
+        JSON.stringify({
+          type: "auth",
+          protocol: 2,
+          ...this.session,
+          device: this.device,
+        }),
       );
     };
     socket.onmessage = ({ data }) => {
       if (generation !== this.generation) return;
       try {
         const message = JSON.parse(data);
-        if (message.type === "state") {
+        if (message.type === "state" || message.type === "frame") {
           if (!this.streaming) {
             this.streaming = true;
             this.reconnectDelay = 500;
-            let lastPing = 0;
+            let lastPing = -Infinity;
             this.streamTimer = setInterval(() => {
               if (socket.readyState !== 1 || generation !== this.generation)
                 return;
@@ -212,13 +221,29 @@ export class OnlineClient {
             }, 50);
           }
           this.accept({
-            data: message.room,
+            data: unpackRoom(message.room),
             rtt: this.latency,
             sentAt: performance.now() - this.latency,
+            frameTime:
+              this.clockOffset === undefined
+                ? performance.now() - this.latency / 2
+                : message.room.serverTime - this.clockOffset,
           });
         } else if (message.type === "pong" && Number.isFinite(message.at)) {
           const rtt = performance.now() - message.at;
-          this.latency = this.latency ? this.latency * 0.7 + rtt * 0.3 : rtt;
+          this.streamLatency = this.streamLatency
+            ? this.streamLatency * 0.7 + rtt * 0.3
+            : rtt;
+          this.latency = this.streamLatency;
+          if (Number.isFinite(message.serverTime) && rtt < 1000) {
+            const offset = message.serverTime - (performance.now() - rtt / 2);
+            if (
+              this.clockOffset === undefined ||
+              rtt <= (this.bestRtt ?? Infinity) * 1.25
+            )
+              this.clockOffset = offset;
+            this.bestRtt = Math.min(this.bestRtt ?? Infinity, rtt);
+          }
         }
       } catch {
         this.onError?.(new Error("Invalid server update. Reconnecting…"));
@@ -255,6 +280,10 @@ export class OnlineClient {
     clearTimeout(this.reconnectTimer);
     clearInterval(this.streamTimer);
     this.streaming = false;
+    this.connectionStatus = null;
+    this.clockOffset = undefined;
+    this.bestRtt = undefined;
+    this.streamLatency = undefined;
     this.socket?.close();
     this.socket = null;
     this.session = null;

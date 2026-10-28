@@ -113,6 +113,20 @@ export class OnlineLobby {
   }
   render(room, status = "connected") {
     this.room = room;
+    const signature = JSON.stringify([
+      this.busy,
+      status,
+      room?.code,
+      room?.host,
+      room?.self,
+      room?.players.map(({ sequence, ...player }) => player),
+      room?.snapshot?.race.phase,
+      room?.snapshot?.race.phase === "finished"
+        ? room.snapshot.race.entries
+        : null,
+    ]);
+    if (signature === this.renderSignature) return;
+    this.renderSignature = signature;
     document.getElementById("online-entry").hidden = !!room;
     document.getElementById("online-room").hidden = !room;
     document.getElementById("online-create").disabled = this.busy;

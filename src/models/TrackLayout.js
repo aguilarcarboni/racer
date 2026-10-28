@@ -56,11 +56,13 @@ export class TrackLayout {
   }
   nearest(position) {
     let best = Infinity,
-      result = null;
-    for (let i = 0; i < this.samples.length; i++) {
+      bestIndex = 0,
+      bestFraction = 0;
+    const n = this.samples.length;
+    for (let i = 0; i < n; i++) {
       const a = this.samples[i],
-        b = this.samples[(i + 1) % this.samples.length],
-        dx = b.x - a.x,
+        b = this.samples[(i + 1) % n];
+      const dx = b.x - a.x,
         dz = b.z - a.z;
       const f = Math.max(
         0,
@@ -70,25 +72,32 @@ export class TrackLayout {
             (dx * dx + dz * dz),
         ),
       );
-      const x = a.x + f * dx,
-        z = a.z + f * dz,
-        d2 = (position.x - x) ** 2 + (position.z - z) ** 2;
+      const d2 =
+        (position.x - a.x - f * dx) ** 2 + (position.z - a.z - f * dz) ** 2;
       if (d2 < best) {
         best = d2;
-        const len = Math.hypot(dx, dz);
-        result = {
-          x,
-          z,
-          tx: dx / len,
-          tz: dz / len,
-          progress: (i + f) / this.samples.length,
-          signedDistance: ((position.x - x) * dz - (position.z - z) * dx) / len,
-          distance: Math.sqrt(d2),
-        };
+        bestIndex = i;
+        bestFraction = f;
       }
     }
-    return result;
+    const a = this.samples[bestIndex],
+      b = this.samples[(bestIndex + 1) % n];
+    const dx = b.x - a.x,
+      dz = b.z - a.z,
+      len = Math.hypot(dx, dz),
+      x = a.x + bestFraction * dx,
+      z = a.z + bestFraction * dz;
+    return {
+      x,
+      z,
+      tx: dx / len,
+      tz: dz / len,
+      progress: (bestIndex + bestFraction) / n,
+      signedDistance: ((position.x - x) * dz - (position.z - z) * dx) / len,
+      distance: Math.sqrt(best),
+    };
   }
+
   getSurface(position) {
     const d = this.nearest(position).distance;
     return d <= 6

@@ -1,3 +1,4 @@
+import { TrackBroadphase } from "../physics/TrackBroadphase.js";
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { RaceField } from "../racing/RaceField.js";
@@ -31,7 +32,7 @@ export class Game {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.81, 0) });
-    this.world.broadphase = new CANNON.SAPBroadphase(this.world);
+    this.world.broadphase = new TrackBroadphase(this.world);
     this.world.solver.iterations = 12;
     this.input = new InputController();
     this.controllers = new LocalControllers();

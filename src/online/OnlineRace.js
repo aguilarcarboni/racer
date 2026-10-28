@@ -1,3 +1,5 @@
+import { Quaternion } from "three";
+import { PredictionHistory } from "./PredictionHistory.js";
 import { OnlineClient } from "./OnlineClient.js";
 import { SnapshotBuffer } from "./SnapshotBuffer.js";
 import { OnlineLobby } from "../ui/OnlineLobby.js";
@@ -33,6 +35,9 @@ export class OnlineRace {
     });
     this.client = new OnlineClient();
     this.buffer = new SnapshotBuffer();
+    this.prediction = new PredictionHistory();
+    this.rotationOffset = new Quaternion();
+    this.identityRotation = new Quaternion();
     this.active = false;
     this.match = -1;
     this.accumulator = 0;
@@ -73,6 +78,8 @@ export class OnlineRace {
   }
   async leave() {
     this.active = false;
+    this.prediction.clear();
+    this.race.entries.forEach((e) => e.car.setPredictionProxy(false));
     this.room = null;
     this.match = -1;
     this.hudSignature = "";
@@ -114,6 +121,7 @@ export class OnlineRace {
     const entry = this.race.entries.find((e) => e.id === self.carId);
     if (!this.cameraCar || this.cameraCar.car !== entry.car) {
       this.cameraCar = new CameraCar(entry.car);
+      this.race.entries.forEach((e) => e.car.setPredictionProxy(e !== entry));
       this.views.configure([{ car: this.cameraCar }], "side");
       this.views.resize(innerWidth, innerHeight);
     }
@@ -121,6 +129,8 @@ export class OnlineRace {
     if (room.match !== this.match) {
       this.match = room.match;
       this.buffer.clear();
+      this.prediction.clear();
+      this.rotationOffset.identity();
       this.offset = { x: 0, y: 0, z: 0 };
       this.accumulator = 0;
       this.views.reset();
@@ -131,11 +141,16 @@ export class OnlineRace {
         this.race.entries
           .find((e) => e.id === remote.id)
           .car.restoreState(remote.physics);
-      // Predict the short return journey, then blend only the presentation correction.
-      const advance = Math.min(0.1, timing.rtt / 2000);
+      // Replay the actual recent controls, rather than applying today's steering to old snapshots.
+      const now = performance.now();
+      const frameTime = Math.min(
+        now,
+        timing.frameTime ?? now - Math.min(150, timing.rtt / 2),
+      );
       if (room.snapshot.race.phase === "racing")
-        for (let i = 0; i < Math.floor(advance / VEHICLE.fixedStep); i++)
-          this.predict(this.client.input, VEHICLE.fixedStep);
+        this.prediction.replay(frameTime, now, (input, dt) =>
+          this.predict(input, dt),
+        );
       const after = this.own.car.getPose(),
         distance = Math.hypot(before.x - after.x, before.z - after.z);
       this.offset =
@@ -146,7 +161,24 @@ export class OnlineRace {
               z: before.z - after.z,
             }
           : { x: 0, y: 0, z: 0 };
-      this.buffer.push(room.snapshot.cars, performance.now() - timing.rtt / 2);
+      if (distance < 6) {
+        this.rotationOffset
+          .set(
+            before.quaternion.x,
+            before.quaternion.y,
+            before.quaternion.z,
+            before.quaternion.w,
+          )
+          .multiply(
+            new Quaternion(
+              after.quaternion.x,
+              after.quaternion.y,
+              after.quaternion.z,
+              after.quaternion.w,
+            ).invert(),
+          );
+      } else this.rotationOffset.identity();
+      this.buffer.push(room.snapshot.cars, frameTime);
       if (!priorPhase || priorPhase === "waiting") {
         this.lobby.hide();
         this.onMenu(false);
@@ -206,22 +238,45 @@ export class OnlineRace {
         speedKmh: Math.round(this.own.car.getDebugState().speedMps * 3.6),
         input: controls,
         rttMs: Math.round(this.client.latency),
+        frameMs: Math.round(dt * 1000),
+        correctionM:
+          Math.round(Math.hypot(this.offset.x, this.offset.z) * 100) / 100,
       });
     }
     const snapshot = this.room?.snapshot;
     if (snapshot) {
       if (["racing", "finished"].includes(snapshot.race.phase)) {
         this.accumulator += dt;
-        while (this.accumulator >= VEHICLE.fixedStep) {
+        let steps = 0;
+        while (this.accumulator >= VEHICLE.fixedStep && steps++ < 8) {
           this.predict(controls, VEHICLE.fixedStep);
           this.accumulator -= VEHICLE.fixedStep;
+          this.prediction.record(
+            performance.now() - this.accumulator * 1000,
+            VEHICLE.fixedStep,
+            controls,
+          );
         }
       }
-      const decay = Math.exp(-dt * 12);
+      this.accumulator = Math.min(this.accumulator, VEHICLE.fixedStep);
+      const decay = Math.exp(-dt * 18);
       for (const key of ["x", "y", "z"]) this.offset[key] *= decay;
       const ownPose = this.own.car.getPose();
+      this.rotationOffset.slerp(this.identityRotation, 1 - Math.exp(-dt * 18));
+      const visualRotation = new Quaternion(
+        ownPose.quaternion.x,
+        ownPose.quaternion.y,
+        ownPose.quaternion.z,
+        ownPose.quaternion.w,
+      ).premultiply(this.rotationOffset);
       this.cameraCar.pose = {
         ...ownPose,
+        quaternion: {
+          x: visualRotation.x,
+          y: visualRotation.y,
+          z: visualRotation.z,
+          w: visualRotation.w,
+        },
         x: ownPose.x + this.offset.x,
         y: ownPose.y + this.offset.y,
         z: ownPose.z + this.offset.z,

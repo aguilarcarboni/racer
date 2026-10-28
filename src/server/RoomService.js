@@ -250,7 +250,12 @@ export class RoomService {
     }
     return null;
   }
-  view(room, self, now) {
+  view(
+    room,
+    self,
+    now,
+    snapshot = room.sim ? this.simulation.snapshot(room.sim) : null,
+  ) {
     return {
       code: room.code,
       host: room.host,
@@ -268,7 +273,7 @@ export class RoomService {
         left: p.left,
         sequence: p.id === self ? p.sequence : undefined,
       })),
-      snapshot: room.sim ? this.simulation.snapshot(room.sim) : null,
+      snapshot,
     };
   }
 }

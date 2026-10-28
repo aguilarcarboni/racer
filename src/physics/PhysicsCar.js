@@ -55,6 +55,17 @@ export class PhysicsCar {
       this.vehicle.setSteeringValue(forces.steerAngle, i);
   }
   syncVisuals(dt = 0) {}
+  setPredictionProxy(enabled) {
+    if (!!this.predictionProxy === enabled) return;
+    this.predictionProxy = enabled;
+    // Remote cars keep collision hulls but do not run a second wheel simulation in the browser.
+    this.body.type = enabled ? CANNON.Body.KINEMATIC : CANNON.Body.DYNAMIC;
+    if (enabled)
+      this.world.removeEventListener("preStep", this.vehicle.preStepCallback);
+    else this.world.addEventListener("preStep", this.vehicle.preStepCallback);
+    this.body.aabbNeedsUpdate = true;
+    this.body.wakeUp();
+  }
   reset() {
     this.body.position.copy(this.startPosition);
     this.body.quaternion.setFromEuler(0, this.spawnYaw, 0);

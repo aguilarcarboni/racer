@@ -5,7 +5,8 @@ const allowedOrigins = (
 )
   .split(",")
   .map((v) => v.trim());
-const { server, hub } = createRealtimeServer({ allowedOrigins });
+const { server, hub, service } = createRealtimeServer({ allowedOrigins });
+service.simulation.get();
 server.listen(Number(process.env.PORT) || 8080, "0.0.0.0", () =>
   console.info("[Online:listening]", {
     port: Number(process.env.PORT) || 8080,

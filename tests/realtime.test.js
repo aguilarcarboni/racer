@@ -1,3 +1,4 @@
+import { unpackRoom } from "../src/online/SnapshotCodec.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { once } from "node:events";
@@ -43,14 +44,17 @@ test(
       const view = { socket, room: null, frames: 0 };
       socket.on("message", (raw) => {
         const msg = JSON.parse(raw);
-        if (msg.type === "state") {
-          view.room = msg.room;
+        if (msg.type === "state" || msg.type === "frame") {
+          view.room = unpackRoom(msg.room);
+          if (msg.type === "frame" && msg.room.snapshot)
+            assert.ok(raw.length < 6000);
           view.frames++;
         }
       });
       socket.send(
         JSON.stringify({
           type: "auth",
+          protocol: 2,
           code,
           token: player.token,
           device: player.device,
@@ -107,6 +111,7 @@ test(
       bad.send(
         JSON.stringify({
           type: "auth",
+          protocol: 2,
           code,
           device: players[0].device,
           token: "wrong",

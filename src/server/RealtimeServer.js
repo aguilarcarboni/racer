@@ -21,6 +21,7 @@ export function createRealtimeServer({ allowedOrigins = [] } = {}) {
           ...cors,
           "access-control-allow-methods": "POST, GET, OPTIONS",
           "access-control-allow-headers": "content-type",
+          "access-control-max-age": "600",
         })
         .end();
       return;
