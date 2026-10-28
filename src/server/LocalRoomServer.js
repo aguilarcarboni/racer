@@ -17,6 +17,9 @@ export function localD1(database = new DatabaseSync(":memory:")) {
       return {
         bind(...args) {
           return {
+            async all() {
+              return { results: database.prepare(sql).all(...args) };
+            },
             async first() {
               return database.prepare(sql).get(...args) ?? null;
             },
@@ -66,6 +69,7 @@ export function onlineDevPlugin() {
           );
           const response = await handleRoomRequest(request, service, {
             transport: "websocket",
+            getStats: () => hub.getStats(),
           });
           res.writeHead(response.status, Object.fromEntries(response.headers));
           res.end(Buffer.from(await response.arrayBuffer()));

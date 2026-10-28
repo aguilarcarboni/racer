@@ -30,6 +30,13 @@ export class OnlineClient {
     this.input = { ...IDLE_INPUT };
     this.revision = -1;
     this.latency = 0;
+    globalThis.addEventListener?.("pagehide", () => this.disconnectOnExit());
+    globalThis.addEventListener?.("pageshow", (event) => {
+      if (event.persisted && this.leftOnPageHide) {
+        this.leftOnPageHide = false;
+        this.onClosed?.("You left the lobby when leaving the page.");
+      }
+    });
   }
   setInput(input) {
     this.input = cleanInput(input);
@@ -77,6 +84,10 @@ export class OnlineClient {
     }
   }
   accept(result) {
+    if (result.data.closed) {
+      this.endSession(result.data.reason);
+      return;
+    }
     if (result.data.revision < this.revision) return;
     this.revision = result.data.revision;
     this.room = result.data;
@@ -89,7 +100,7 @@ export class OnlineClient {
   async connect(action, name, code = "") {
     if (this.session) await this.leave();
     this.revision = -1;
-    this.generation++;
+    const generation = ++this.generation;
     let saved;
     try {
       saved = JSON.parse(
@@ -104,6 +115,17 @@ export class OnlineClient {
       { name },
       resume,
     );
+    if (generation !== this.generation) {
+      const abandoned = {
+        code: result.data.code,
+        token: result.data.token ?? resume?.token,
+      };
+      if (abandoned.token)
+        try {
+          await this.api(`/${abandoned.code}/leave`, {}, abandoned);
+        } catch {}
+      return false;
+    }
     this.session = {
       code: result.data.code,
       token: result.data.token ?? resume?.token,
@@ -131,9 +153,17 @@ export class OnlineClient {
       this.sessionStorage.removeItem("racer-online-session");
     }
     if (!saved) return false;
-    const result = await this.api(`/${saved.code}/poll`, {}, saved);
+    const generation = ++this.generation;
+    let result;
+    try {
+      result = await this.api(`/${saved.code}/poll`, {}, saved);
+    } catch (error) {
+      if (generation !== this.generation) return false;
+      this.clearSession();
+      throw error;
+    }
+    if (generation !== this.generation) return false;
     this.session = saved;
-    this.generation++;
     this.revision = -1;
     this.sequence =
       (result.data.players.find((p) => p.id === result.data.self)?.sequence ??
@@ -166,12 +196,12 @@ export class OnlineClient {
       if (generation !== this.generation) return;
       this.connectionStatus = "reconnecting";
       this.onStatus?.("reconnecting");
-      this.onError?.(error);
-      delay = 1200;
       if ([401, 404, 410].includes(error.status)) {
-        this.clearSession();
+        this.endSession(error.message);
         return;
       }
+      this.onError?.(error);
+      delay = 1200;
     }
     if (generation === this.generation)
       this.timer = setTimeout(() => this.poll(generation), delay);
@@ -203,6 +233,10 @@ export class OnlineClient {
       if (generation !== this.generation) return;
       try {
         const message = JSON.parse(data);
+        if (message.type === "closed") {
+          this.endSession(message.reason);
+          return;
+        }
         if (message.type === "state" || message.type === "frame") {
           if (!this.streaming) {
             this.streaming = true;
@@ -267,9 +301,11 @@ export class OnlineClient {
       this.streaming = false;
       clearInterval(this.streamTimer);
       this.inputSender?.stop();
-      if (code === 1000 && reason === "Session resumed elsewhere") {
-        this.clearSession();
-        this.onError?.(new Error("This player reconnected in another tab."));
+      if (
+        code === 4004 ||
+        (code === 1000 && reason === "Session resumed elsewhere")
+      ) {
+        this.endSession(reason || "The lobby is closed.");
         return;
       }
       this.connectionStatus = "reconnecting";
@@ -286,6 +322,26 @@ export class OnlineClient {
     const generation = this.generation,
       result = await this.api(`/${this.session.code}/${action}`, data);
     if (generation === this.generation) this.accept(result);
+  }
+  endSession(reason = "The lobby is closed.") {
+    if (!this.session && !this.room) return;
+    this.clearSession();
+    this.onClosed?.(reason);
+  }
+  disconnectOnExit() {
+    const session = this.session;
+    if (!session) return;
+    this.leftOnPageHide = true;
+    if (this.socket?.readyState === 1)
+      this.socket.send(JSON.stringify({ type: "leave" }));
+    // Best effort when a page is closing; the server's disconnect deadline is authoritative.
+    this.fetcher(`${this.serverUrl}/api/online/rooms/${session.code}/leave`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device: this.device, token: session.token }),
+      keepalive: true,
+    }).catch(() => {});
+    this.clearSession();
   }
   clearSession() {
     this.generation++;

@@ -177,22 +177,22 @@ test("a member can reconnect with its token, but a stranger cannot steal that se
     /session/,
   );
 });
-test("leaving transfers lobby hosting and the departed device cannot keep driving", async () => {
+test("owner leaving closes the lobby and invalidates every member session", async () => {
   const h = harness();
   await h.create(2);
-  const guest = await h.action(h.players[1], "poll");
-  await h.action(h.players[0], "leave");
-  const view = await h.action(h.players[1], "poll");
-  assert.equal(view.host, guest.self);
-  assert.equal(view.players.length, 1);
+  const response = await h.action(h.players[0], "leave");
+  assert.equal(response.closed, true);
+  assert.equal(await h.store.get(response.code), null);
+  await assert.rejects(h.action(h.players[1], "poll"), /expired/);
   await assert.rejects(
     h.action(h.players[0], "input", {
       sequence: 8,
       input: { throttleAxis: 1 },
     }),
-    /session/,
+    /expired/,
   );
 });
+
 test("API rejects foreign origins, oversize requests and malformed codes", async () => {
   const h = harness();
   const request = (path, body, origin = "https://racer.test") =>

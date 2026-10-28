@@ -1,3 +1,4 @@
+import { RoomLifecycle } from "./RoomLifecycle.js";
 import { ONLINE } from "../online/Protocol.js";
 export class D1RoomStore {
   constructor(db) {
@@ -30,6 +31,20 @@ export class D1RoomStore {
       .run();
     return r.meta.changes === 1;
   }
+  async remove(code, revision) {
+    const r = await this.db
+      .prepare("DELETE FROM online_rooms WHERE code = ? AND revision = ?")
+      .bind(code, revision)
+      .run();
+    return r.meta.changes === 1;
+  }
+  async list() {
+    const r = await this.db
+      .prepare("SELECT code FROM online_rooms")
+      .bind()
+      .all();
+    return r.results.map((row) => row.code);
+  }
   async prune(now) {
     await this.db
       .prepare("DELETE FROM online_rooms WHERE expires_at < ?")
@@ -52,6 +67,9 @@ export class MemoryRoomStore {
   constructor() {
     this.rooms = new Map();
   }
+  roomCount() {
+    return this.rooms.size;
+  }
   async get(code) {
     const value = this.rooms.get(code);
     return value ? structuredClone(value) : null;
@@ -70,6 +88,15 @@ export class MemoryRoomStore {
     });
     return true;
   }
+  async remove(code, revision) {
+    const row = this.rooms.get(code);
+    if (!row || row.revision !== revision) return false;
+    this.rooms.delete(code);
+    return true;
+  }
+  async list() {
+    return [...this.rooms.keys()];
+  }
   async prune(now) {
     for (const [code, value] of this.rooms)
       if (value.room.expiresAt < now) this.rooms.delete(code);
@@ -82,14 +109,16 @@ export class MemoryRoomStore {
   setControls(code, member, sequence, input, now) {
     const row = this.rooms.get(code),
       player = row?.room.players.find((p) => p.id === member && !p.left);
-    if (!player) return false;
+    if (!player || RoomLifecycle.reason(row.room, now)) return false;
     if (Number.isSafeInteger(sequence) && sequence > player.sequence) {
+      if (RoomLifecycle.controlsChanged(player.input, input))
+        RoomLifecycle.touch(row.room, now);
       player.sequence = sequence;
       player.input = input;
       row.revision++;
     }
     player.lastSeen = now;
-    row.room.expiresAt = now + ONLINE.roomExpiryMs;
+    RoomLifecycle.updateExpiry(row.room);
     return true;
   }
   park(code, member, now) {

@@ -4,7 +4,13 @@ export const ONLINE = Object.freeze({
   lobbyMs: 1000,
   staleInputMs: 700,
   disconnectMs: 30000,
-  roomExpiryMs: 1800000,
+  roomExpiryMs: 1800000, // Legacy compatibility; active rooms use phase-specific idle limits.
+  lobbyIdleMs: 5 * 60 * 1000,
+  raceIdleMs: 10 * 60 * 1000,
+  finishedIdleMs: 2 * 60 * 1000,
+  maxRoomLifeMs: 2 * 60 * 60 * 1000,
+  socketSilenceMs: 15000,
+  cleanupMs: 5000,
 });
 export const CAR_IDS = ["you", "sol", "rio", "nova"];
 export const CAR_COLORS = ["#dd542f", "#4d91cc", "#eee5cb", "#77a461"];

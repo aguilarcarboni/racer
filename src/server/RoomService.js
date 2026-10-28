@@ -1,3 +1,4 @@
+import { RoomLifecycle } from "./RoomLifecycle.js";
 import {
   CAR_IDS,
   CAR_COLORS,
@@ -38,7 +39,7 @@ export class RoomService {
   async create(data) {
     this.validateDevice(data.device);
     const now = this.now();
-    await this.store.prune(now);
+    await this.cleanup();
     if ((await this.store.count(data.device)) >= 2)
       throw new RoomError(
         "Leave an existing lobby before creating another.",
@@ -52,7 +53,8 @@ export class RoomService {
         host: player.id,
         creatorDevice: data.device,
         createdAt: now,
-        expiresAt: now + ONLINE.roomExpiryMs,
+        expiresAt: now + ONLINE.lobbyIdleMs,
+        lastActivityAt: now,
         players: [player],
         sim: null,
         lastStep: now,
@@ -92,21 +94,20 @@ export class RoomService {
     for (let attempt = 0; attempt < 12; attempt++) {
       const row = await this.store.get(code),
         now = this.now();
-      if (!row || row.room.expiresAt < now)
-        throw new RoomError("Lobby not found or expired.", 404);
+      if (!row) throw new RoomError("Lobby not found or expired.", 404);
       const room = row.room;
-      this.simulation.advance(room, now);
+      const closedReason = RoomLifecycle.reason(room, now);
+      if (closedReason) {
+        if (await this.closeRoom(code, row, closedReason))
+          throw new RoomError("Lobby not found or expired.", 404);
+        continue;
+      }
       if (!room.sim) {
         room.players = room.players.filter(
           (p) => !p.left && now - p.lastSeen < ONLINE.disconnectMs,
         );
         room.players.forEach((p, i) => (p.slot = i));
       }
-      const active = room.players.filter(
-        (p) => !p.left && now - p.lastSeen < ONLINE.disconnectMs,
-      );
-      if (!active.some((p) => p.id === room.host))
-        room.host = active[0]?.id ?? null;
       let player = room.players.find(
         (p) => p.secret === tokenHash && p.device === data.device && !p.left,
       );
@@ -135,7 +136,14 @@ export class RoomService {
           "Your lobby session is no longer valid. Join again.",
           401,
         );
+      if (action === "leave" || action === "close")
+        return this.depart(code, player.id, action === "close");
+      const phaseBefore = room.sim?.race.phase;
+      this.simulation.advance(room, now);
+      if (phaseBefore !== room.sim?.race.phase) RoomLifecycle.touch(room, now);
       player.lastSeen = now;
+      if (["join", "ready", "start", "rematch"].includes(action))
+        RoomLifecycle.touch(room, now);
       if (action === "ready") {
         if (room.sim) throw new RoomError("The race is already running.", 409);
         player.ready = data.ready === true;
@@ -160,14 +168,13 @@ export class RoomService {
           Number.isSafeInteger(data.sequence) &&
           data.sequence > player.sequence
         ) {
+          if (
+            RoomLifecycle.controlsChanged(player.input, cleanInput(data.input))
+          )
+            RoomLifecycle.touch(room, now);
           player.sequence = data.sequence;
           player.input = cleanInput(data.input);
         }
-      } else if (action === "leave") {
-        player.left = true;
-        player.input = { ...IDLE_INPUT, brakeAxis: 1, parked: true };
-        const next = room.players.find((p) => !p.left);
-        if (room.host === player.id) room.host = next?.id ?? null;
       } else if (action === "rematch") {
         if (room.host !== player.id)
           throw new RoomError("Only the host can start another round.", 403);
@@ -197,7 +204,7 @@ export class RoomService {
         ].includes(action)
       )
         throw new RoomError("Unknown lobby action.", 404);
-      room.expiresAt = now + ONLINE.roomExpiryMs;
+      RoomLifecycle.updateExpiry(room);
       if (await this.store.compareAndSwap(code, row.revision, room)) {
         if (!["input", "poll"].includes(action))
           console.info(`[Online:${action}]`, {
@@ -215,10 +222,53 @@ export class RoomService {
     }
     throw new RoomError("Lobby is busy. Reconnecting…", 503);
   }
+  async closeRoom(code, row, reason) {
+    if (!(await this.store.remove(code, row.revision))) return null;
+    console.info("[Online:close]", { code, reason });
+    this.onClose?.(code, reason);
+    return { code, closed: true, reason };
+  }
+  async depart(code, member, explicitClose = false) {
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const row = await this.store.get(code);
+      if (!row) throw new RoomError("Lobby not found or expired.", 404);
+      const player = row.room.players.find((p) => p.id === member && !p.left);
+      if (!player)
+        throw new RoomError("Your lobby session is no longer valid.", 401);
+      if (explicitClose && row.room.host !== member)
+        throw new RoomError("Only the owner can close the lobby.", 403);
+      if (row.room.host === member) {
+        const closed = await this.closeRoom(
+          code,
+          row,
+          "The owner closed the lobby.",
+        );
+        if (closed) return closed;
+        continue;
+      }
+      player.left = true;
+      player.input = { ...IDLE_INPUT, brakeAxis: 1, parked: true };
+      if (await this.store.compareAndSwap(code, row.revision, row.room))
+        return { code, left: true };
+    }
+    throw new RoomError("Lobby is busy. Try leaving again.", 503);
+  }
+  async cleanup() {
+    for (const code of await this.store.list()) {
+      const row = await this.store.get(code);
+      if (!row) continue;
+      const reason = RoomLifecycle.reason(row.room, this.now());
+      if (reason) await this.closeRoom(code, row, reason);
+    }
+  }
   async authenticate(code, data) {
     const row = await this.store.get(code);
-    if (!row || row.room.expiresAt < this.now())
+    if (!row) throw new RoomError("Lobby not found or expired.", 404);
+    const reason = RoomLifecycle.reason(row.room, this.now());
+    if (reason) {
+      await this.closeRoom(code, row, reason);
       throw new RoomError("Lobby not found or expired.", 404);
+    }
     const secret = typeof data.token === "string" ? await hash(data.token) : "";
     const player = row.room.players.find(
       (p) => p.secret === secret && p.device === data.device && !p.left,
@@ -231,20 +281,22 @@ export class RoomService {
     for (let attempt = 0; attempt < 12; attempt++) {
       const row = await this.store.get(code);
       if (!row) return null;
-      const now = this.now();
-      if (row.room.expiresAt < now) return null;
+      const now = this.now(),
+        reason = RoomLifecycle.reason(row.room, now);
+      if (reason) {
+        if (await this.closeRoom(code, row, reason)) return null;
+        continue;
+      }
+      const phase = row.room.sim?.race.phase;
       this.simulation.advance(row.room, now);
+      if (phase !== row.room.sim?.race.phase)
+        RoomLifecycle.touch(row.room, now);
       if (!row.room.sim) {
         row.room.players = row.room.players.filter(
           (p) => !p.left && now - p.lastSeen < ONLINE.disconnectMs,
         );
         row.room.players.forEach((p, i) => (p.slot = i));
       }
-      const active = row.room.players.filter(
-        (p) => !p.left && now - p.lastSeen < ONLINE.disconnectMs,
-      );
-      if (!active.some((p) => p.id === row.room.host))
-        row.room.host = active[0]?.id ?? null;
       if (await this.store.compareAndSwap(code, row.revision, row.room))
         return { ...row, revision: row.revision + 1 };
     }

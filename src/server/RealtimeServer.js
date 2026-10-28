@@ -46,7 +46,11 @@ export function createRealtimeServer({ allowedOrigins = [] } = {}) {
           ...(req.method === "POST" ? { body: Buffer.concat(parts) } : {}),
         }),
         service,
-        { allowedOrigins, transport: "websocket" },
+        {
+          allowedOrigins,
+          transport: "websocket",
+          getStats: () => hub.getStats(),
+        },
       );
       res.writeHead(response.status, {
         ...Object.fromEntries(response.headers),

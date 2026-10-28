@@ -64,9 +64,12 @@ export class OnlineRace {
         this.leave();
       }
     };
-    this.client.resume().catch(() => {
-      this.client.clearSession();
-    });
+    this.client.onClosed = (reason) => {
+      this.leave();
+      this.open();
+      this.lobby.message(reason);
+    };
+    this.client.resume().catch(() => {});
     if (new URL(location.href).searchParams.has("room")) this.open();
   }
   get visible() {
@@ -81,6 +84,8 @@ export class OnlineRace {
     this.prediction.clear();
     this.race.entries.forEach((e) => e.car.setPredictionProxy(false));
     this.room = null;
+    this.cameraCar = null;
+    this.own = null;
     this.match = -1;
     this.hudSignature = "";
     const url = new URL(location.href);

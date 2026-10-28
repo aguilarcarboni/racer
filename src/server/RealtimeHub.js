@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 import { packRoom } from "../online/SnapshotCodec.js";
-import { cleanInput } from "../online/Protocol.js";
+import { ONLINE, cleanInput } from "../online/Protocol.js";
 export class RealtimeHub {
   constructor(service, store, { allowedOrigins = [] } = {}) {
     this.service = service;
@@ -16,8 +16,10 @@ export class RealtimeHub {
       perMessageDeflate: false,
     });
     this.sockets.on("connection", (socket) => this.connect(socket));
-    this.timer = setInterval(() => this.broadcast(), 1000 / 60);
-    this.timer.unref?.();
+    this.timer = null;
+    this.service.onClose = (code, reason) => this.closeRoom(code, reason);
+    this.cleanupTimer = setInterval(() => this.cleanup(), ONLINE.cleanupMs);
+    this.cleanupTimer.unref?.();
   }
   attach(server) {
     server.on("upgrade", (request, socket, head) => {
@@ -34,13 +36,72 @@ export class RealtimeHub {
       );
     });
   }
+  getStats() {
+    return {
+      rooms: this.store.roomCount(),
+      connections: this.peers.size,
+      roomPumpRunning: !!this.timer,
+    };
+  }
+  startPump() {
+    if (!this.timer) {
+      this.timer = setInterval(() => this.broadcast(), 1000 / 60);
+      this.timer.unref?.();
+    }
+  }
+  stopIdlePump() {
+    if (![...this.peers].some((p) => p.member && !p.closing)) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+  }
+  closePeer(peer, reason, code = 4004) {
+    if (peer.closing) return;
+    peer.closing = true;
+    if (peer.socket.readyState === 1) {
+      if (code === 4004 && peer.socket.bufferedAmount < 16000)
+        peer.socket.send(JSON.stringify({ type: "closed", reason }));
+      peer.socket.close(code, reason);
+    }
+    peer.forceClose = setTimeout(() => peer.socket.terminate(), 2000);
+    peer.forceClose.unref?.();
+    this.peers.delete(peer);
+    this.stopIdlePump();
+  }
+  closeRoom(code, reason) {
+    this.lobbySentAt.delete(code);
+    this.frameDueAt.delete(code);
+    for (const peer of [...this.peers])
+      if (peer.code === code) this.closePeer(peer, reason);
+  }
+  async cleanup() {
+    if (this.cleaning) return;
+    this.cleaning = true;
+    try {
+      const now = Date.now();
+      for (const peer of [...this.peers])
+        if (peer.member && now - peer.lastMessageAt >= ONLINE.socketSilenceMs)
+          this.closePeer(peer, "Connection timed out.", 4005);
+      await this.service.cleanup();
+      this.stopIdlePump();
+    } catch (error) {
+      console.error("[Online:cleanup-error]", error.message);
+    } finally {
+      this.cleaning = false;
+    }
+  }
   connect(socket) {
+    if (this.peers.size >= 64) {
+      socket.close(1013, "Server is busy");
+      return;
+    }
     const peer = {
       socket,
       member: null,
       code: null,
       received: 0,
       window: Date.now(),
+      lastMessageAt: Date.now(),
     };
     this.peers.add(peer);
     const authTimeout = setTimeout(() => {
@@ -58,11 +119,14 @@ export class RealtimeHub {
           return;
         }
         const message = JSON.parse(raw.toString());
+        peer.lastMessageAt = Date.now();
         if (!peer.member) {
           if (message.type !== "auth") throw new Error("Session required");
           peer.protocol = message.protocol === 2 ? 2 : 1;
           peer.member = await this.service.authenticate(message.code, message);
           peer.code = message.code;
+          if (socket.readyState !== 1 || !this.peers.has(peer)) return;
+          this.startPump();
           clearTimeout(authTimeout);
           for (const old of this.peers)
             if (
@@ -79,6 +143,8 @@ export class RealtimeHub {
               revision: row.revision,
             },
           });
+        } else if (message.type === "leave") {
+          await this.service.depart(peer.code, peer.member);
         } else if (message.type === "input") {
           if (
             !this.store.setControls(
@@ -102,7 +168,9 @@ export class RealtimeHub {
     });
     socket.on("close", () => {
       clearTimeout(authTimeout);
+      clearTimeout(peer.forceClose);
       this.peers.delete(peer);
+      this.stopIdlePump();
       if (
         peer.member &&
         ![...this.peers].some(
@@ -127,17 +195,21 @@ export class RealtimeHub {
       );
   }
   async broadcast() {
-    if (this.busy || !this.peers.size) return;
+    if (this.busy || !this.peers.size) {
+      this.stopIdlePump();
+      return;
+    }
     this.busy = true;
     const started = performance.now();
     try {
       for (const code of new Set(
-        [...this.peers].filter((p) => p.member).map((p) => p.code),
+        [...this.peers]
+          .filter((p) => p.member && !p.closing)
+          .map((p) => p.code),
       )) {
         const row = await this.service.tick(code);
         if (!row) {
-          for (const peer of this.peers)
-            if (peer.code === code) peer.socket.close(1008, "Lobby expired");
+          this.closeRoom(code, "Lobby not found or expired.");
           continue;
         }
         if (
@@ -160,7 +232,7 @@ export class RealtimeHub {
             if (
               !row.room.players.some((p) => p.id === peer.member && !p.left)
             ) {
-              peer.socket.close(1000, "Left lobby");
+              this.closePeer(peer, "You left the lobby.");
               continue;
             }
             this.send(peer, {
@@ -205,7 +277,9 @@ export class RealtimeHub {
   }
   close() {
     clearInterval(this.timer);
-    for (const p of this.peers) p.socket.close();
+    clearInterval(this.cleanupTimer);
+    this.timer = null;
+    for (const p of this.peers) p.socket.terminate();
     this.sockets.close();
   }
 }

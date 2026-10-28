@@ -2,12 +2,12 @@ import { RoomError } from "./RoomService.js";
 export async function handleRoomRequest(
   request,
   service,
-  { allowedOrigins = [], transport = "http-snapshots" } = {},
+  { allowedOrigins = [], transport = "http-snapshots", getStats } = {},
 ) {
   const url = new URL(request.url);
   if (url.pathname === "/api/online/health")
     return Response.json(
-      { available: true, maxPlayers: 4, transport },
+      { available: true, maxPlayers: 4, transport, ...getStats?.() },
       { headers: { "cache-control": "no-store" } },
     );
   try {
@@ -48,7 +48,7 @@ export async function handleRoomRequest(
     if (!data || Array.isArray(data) || typeof data !== "object")
       throw new RoomError("Invalid lobby request.");
     const match = url.pathname.match(
-      /^\/api\/online\/rooms\/([A-Z2-9]{6})\/(join|poll|ready|start|input|leave|rematch)$/,
+      /^\/api\/online\/rooms\/([A-Z2-9]{6})\/(join|poll|ready|start|input|leave|close|rematch)$/,
     );
     const result =
       url.pathname === "/api/online/rooms"

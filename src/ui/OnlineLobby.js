@@ -131,6 +131,14 @@ export class OnlineLobby {
     document.getElementById("online-room").hidden = !room;
     document.getElementById("online-create").disabled = this.busy;
     document.getElementById("online-join").disabled = this.busy;
+    document.getElementById("online-leave").textContent =
+      room?.host === room?.self && room
+        ? "Close lobby for everyone"
+        : "Leave lobby";
+    document.getElementById("online-offline").textContent =
+      room?.host === room?.self && room
+        ? "Close lobby & play offline"
+        : "Back to offline";
     if (!room) return;
     const self = room.players.find((p) => p.id === room.self),
       phase = room.snapshot?.race.phase ?? "waiting",
