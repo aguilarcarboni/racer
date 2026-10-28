@@ -4,6 +4,7 @@ import { RaceField } from "../racing/RaceField.js";
 import { Track } from "../models/Track.js";
 import { Car } from "../models/Car.js";
 import { LapTracker } from "../models/LapTracker.js";
+import { getKeyboardCount } from "./KeyboardProfiles.js";
 import { InputController } from "./InputController.js";
 import { LocalRaceGate } from "./LocalRaceGate.js";
 import { LocalControllers } from "./LocalControllers.js";
@@ -36,7 +37,7 @@ export class Game {
     this.telemetry = new Telemetry();
     this.laps = new LapTracker();
     this.playerCount = 1;
-    this.keyboardPlayerOne = true;
+    this.keyboardPlayers = 1;
     this.orientation = "side";
     this.accumulator = 0;
     this.lastTime = null;
@@ -71,7 +72,7 @@ export class Game {
       this.toggleCameraMode(index),
     );
     this.lobby = new LocalLobby({
-      onCount: (count) => this.configurePlayers(count, this.keyboardPlayerOne),
+      onCount: (count) => this.configurePlayers(count, this.keyboardPlayers),
       onKeyboard: (keyboard) =>
         this.configurePlayers(this.playerCount, keyboard),
       onLayout: (layout) => this.changeLayout(layout),
@@ -79,19 +80,31 @@ export class Game {
       onPreview: () => this.previewGrid(),
       onSolo: () => this.returnToSolo(),
     });
-    this.configurePlayers(1, true);
+    this.configurePlayers(1, 1);
     this.hud.bindTuning({
       getDebugState: () => this.car.getDebugState(),
       setTuning: (values) => this.race.setTuning(values),
     });
     this.input.onReset = () => this.reset();
-    this.input.onToggleCamera = () => this.toggleCameraMode(0);
-    this.input.onShiftUp = () => this.car.shiftUp();
-    this.input.onShiftDown = () => this.car.shiftDown();
+    this.input.onToggleCamera = (i) => {
+      if (!this.lobby.visible) this.toggleCameraMode(i);
+    };
+    this.input.onShiftUp = (i) => {
+      if (!this.lobby.visible && !this.paused) this.players[i]?.car.shiftUp();
+    };
+    this.input.onShiftDown = (i) => {
+      if (!this.lobby.visible && !this.paused) this.players[i]?.car.shiftDown();
+    };
     this.input.onTelemetry = (e) =>
-      this.telemetry.input(e, this.car.getDebugState());
+      this.telemetry.input(
+        e,
+        this.players[(e.player ?? 1) - 1].car.getDebugState(),
+      );
     this.input.onPause = () => this.handlePause();
-    this.input.onToggleTransmission = () => this.car.toggleAutomatic();
+    this.input.onToggleTransmission = () => {
+      if (!this.lobby.visible && !this.paused)
+        this.players[0]?.car.toggleAutomatic();
+    };
     this.input.onToggleGuide = () => {
       const on = this.track.toggleGuide();
       document
@@ -145,20 +158,25 @@ export class Game {
       maxLocalPlayers: 4,
     });
   }
-  configurePlayers(count, keyboardPlayerOne) {
+  configurePlayers(count, keyboardPlayers) {
     this.playerCount = Math.max(1, Math.min(4, Math.round(Number(count) || 1)));
-    this.keyboardPlayerOne = this.playerCount === 1 || !!keyboardPlayerOne;
+    this.keyboardPlayers = getKeyboardCount(this.playerCount, keyboardPlayers);
     this.race.setPlayerCount(this.playerCount);
     this.advance.reset();
     this.players = this.race.getPlayers();
-    this.controllers.configure(this.playerCount, this.keyboardPlayerOne);
+    document.body.dataset.keyboardPlayers = this.keyboardPlayers;
+    const hints = [
+      "P1 WASD / Space / C",
+      "P2 arrows / Right Shift / Enter",
+    ].slice(0, this.keyboardPlayers);
+    if (this.playerCount > this.keyboardPlayers)
+      hints.push("Pad stick / triggers / Y");
+    document.querySelector(".local-controls").textContent =
+      hints.join("  |  ") + "  |  Escape pauses";
+    this.controllers.configure(this.playerCount, this.keyboardPlayers);
     this.views.configure(this.players, this.orientation);
     this.hud.bindRace(this.race.getSnapshot());
-    this.lobby.configure(
-      this.players,
-      this.keyboardPlayerOne,
-      this.orientation,
-    );
+    this.lobby.configure(this.players, this.keyboardPlayers, this.orientation);
     document.body.classList.toggle("split-mode", this.playerCount > 1);
     document.body.dataset.players = this.playerCount;
     document.querySelector(".session-name").innerHTML =
@@ -167,17 +185,17 @@ export class Game {
         : "<i></i> CLUB RACE <span>01 / VALLE</span>";
     this.paused = false;
     this.accumulator = 0;
-    this.input.clear();
+    this.input.configure(this.keyboardPlayers, this.playerCount > 1);
     this.resize();
     this.splitHud.configure(this.players, this.views.layout);
     console.info("[Local:players]", {
       count: this.playerCount,
-      keyboardPlayerOne: this.keyboardPlayerOne,
+      keyboardPlayers: this.keyboardPlayers,
       orientation: this.orientation,
     });
   }
   openLocal() {
-    if (this.playerCount === 1) this.configurePlayers(2, false);
+    if (this.playerCount === 1) this.configurePlayers(2, 0);
     this.lobby.show();
     this.accumulator = 0;
   }
@@ -194,18 +212,14 @@ export class Game {
   }
   returnToSolo() {
     this.lobby.hide();
-    this.configurePlayers(1, true);
+    this.configurePlayers(1, 1);
     this.setPaused(false);
   }
   changeLayout(orientation) {
     this.orientation = orientation === "stacked" ? "stacked" : "side";
     this.views.configure(this.players, this.orientation);
     this.resize();
-    this.lobby.configure(
-      this.players,
-      this.keyboardPlayerOne,
-      this.orientation,
-    );
+    this.lobby.configure(this.players, this.keyboardPlayers, this.orientation);
   }
   reset() {
     this.race.reset();
@@ -228,7 +242,7 @@ export class Game {
       return;
     }
     if (this.playerCount > 1 && !this.controllers.ready) {
-      this.lobby.show("Connect every player controller to continue.");
+      this.lobby.show("Connect the remaining controllers to continue.");
       return;
     }
     this.setPaused(!this.paused);
@@ -253,7 +267,7 @@ export class Game {
     const dt =
       this.lastTime === null ? 0 : Math.min((time - this.lastTime) / 1000, 0.1);
     this.lastTime = time;
-    const inputs = this.controllers.sample(this.input.getState(), {
+    const inputs = this.controllers.sample(this.input.getStates(), {
       allowJoin:
         this.playerCount > 1 && (this.lobby.visible || !this.controllers.ready),
       actionsEnabled:

@@ -7,7 +7,7 @@
     <title>Racer / Valle Motor Park</title>
   </head>
   <body>
-    <div id="app" aria-label="3D racing circuit"></div>
+    <div id="app" tabindex="-1" aria-label="3D racing circuit"></div>
     <div class="vignette"></div>
     <header>
       <a class="brand" href="/" aria-label="Racer home"
@@ -242,9 +242,17 @@
           >
         </div>
         <label class="keyboard-option"
-          ><input id="keyboard-player-one" type="checkbox" />Use keyboard for
-          Player 1</label
-        >
+          >KEYBOARD PLAYERS
+          <select id="keyboard-players">
+            <option value="0">None - all controllers</option>
+            <option value="1">1 - Player 1</option>
+            <option value="2">2 - Players 1 and 2</option>
+          </select>
+        </label>
+        <p class="keyboard-help">
+          P1: WASD, Space handbrake, C camera. P2: arrow keys, Right Shift
+          handbrake, Enter camera. Escape pauses everyone.
+        </p>
         <div
           id="controller-slots"
           class="controller-slots"
@@ -270,8 +278,8 @@
     </section>
     <footer>
       <span class="local-controls"
-        >Left stick steer &nbsp; / &nbsp; LT / RT pedals &nbsp; / &nbsp; Start
-        pause &nbsp; / &nbsp; Y camera</span
+        >P1 WASD / Space / C &nbsp; | &nbsp; P2 arrows / Right Shift / Enter
+        &nbsp; | &nbsp; Pad stick / triggers / Y</span
       ><span><kbd>W / S</kbd> Throttle / brake & reverse</span
       ><span><kbd>A / D</kbd> Steer</span><span><kbd>SPACE</kbd> Handbrake</span
       ><span><kbd>&uarr; / &darr;</kbd> Manual shift</span

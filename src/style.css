@@ -1155,10 +1155,23 @@ h2 {
   margin: 10px 0;
   cursor: pointer;
 }
-.keyboard-option input {
-  accent-color: #e8bf8c;
-  width: 16px;
-  height: 16px;
+.keyboard-option select {
+  min-height: 44px;
+  border: 1px solid #ffffff20;
+  border-radius: 4px;
+  color: #f2eee1;
+  background: #29463a;
+  padding: 0 10px;
+  font: inherit;
+}
+.keyboard-help {
+  color: #c4cbbf;
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+#local-lobby:has(#keyboard-players option[value="0"]:checked) .keyboard-help {
+  display: none;
 }
 .controller-slots {
   display: grid;

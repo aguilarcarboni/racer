@@ -30,8 +30,8 @@ export class LocalControllers {
         }),
     );
   }
-  configure(count, keyboardPlayerOne) {
-    this.assignments.configure(count, keyboardPlayerOne);
+  configure(count, keyboardPlayers) {
+    this.assignments.configure(count, keyboardPlayers);
     this.readers.forEach((r) => r.prime(null));
     this.readerPads.fill("");
     this.ready = count === 1;
@@ -61,7 +61,13 @@ export class LocalControllers {
         });
       }
       return mergeInputState(
-        i === 0 && this.assignments.keyboardPlayerOne ? keyboard : {},
+        status.keyboard
+          ? Array.isArray(keyboard)
+            ? (keyboard[status.keyboardIndex] ?? {})
+            : i === 0
+              ? keyboard
+              : {}
+          : {},
         this.readers[i].getState(pad, { actionsEnabled }),
       );
     });

@@ -1,3 +1,5 @@
+import { getKeyboardCount } from "./KeyboardProfiles.js";
+
 export class GamepadAssignments {
   constructor() {
     this.bindings = Array(4).fill(null);
@@ -5,14 +7,15 @@ export class GamepadAssignments {
     this.connected = Array(4).fill(false);
     this.configure(1, false);
   }
-  configure(count, keyboardPlayerOne = false) {
+  configure(count, keyboardPlayers = 0) {
     this.count = Math.max(1, Math.min(4, Math.round(Number(count) || 1)));
-    this.keyboardPlayerOne = this.count === 1 || !!keyboardPlayerOne;
+    this.keyboardPlayers = getKeyboardCount(this.count, keyboardPlayers);
     for (let i = this.count; i < 4; i++) this.bindings[i] = null;
-    if (this.keyboardPlayerOne) this.bindings[0] = null;
+    for (let i = 0; i < this.keyboardPlayers; i++) this.bindings[i] = null;
     this.connected.fill(false);
   }
   getPad(slot, pads) {
+    if (this.count > 1 && slot < this.keyboardPlayers) return null;
     const binding = this.bindings[slot];
     if (!binding) return null;
     return (
@@ -42,7 +45,7 @@ export class GamepadAssignments {
         )
           continue;
         const slot = Array.from({ length: this.count }, (_, i) => i).find(
-          (i) => !(i === 0 && this.keyboardPlayerOne) && !this.getPad(i, pads),
+          (i) => i >= this.keyboardPlayers && !this.getPad(i, pads),
         );
         if (slot !== undefined) {
           this.bindings[slot] = { index: pad.index, id: pad.id };
@@ -67,7 +70,8 @@ export class GamepadAssignments {
       const pad = this.getPad(i, pads);
       return {
         playerIndex: i,
-        keyboard: i === 0 && this.keyboardPlayerOne,
+        keyboard: i < this.keyboardPlayers,
+        keyboardIndex: i < this.keyboardPlayers ? i : null,
         connected: !!pad,
         index: pad?.index ?? null,
         name: pad?.id ?? "",

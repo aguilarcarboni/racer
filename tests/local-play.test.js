@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as C from "cannon-es";
 import * as THREE from "three";
+import { InputController } from "../src/core/InputController.js";
 import { LocalRaceGate } from "../src/core/LocalRaceGate.js";
 import { GamepadAssignments } from "../src/core/GamepadAssignments.js";
 import { LocalControllers } from "../src/core/LocalControllers.js";
@@ -421,4 +422,126 @@ test("solo throttle-to-start and parked local countdown remain distinct", () => 
     gate.getMode({ ...state, count: 2, phase: "countdown" }),
     "drive",
   );
+});
+
+function keyboardHarness() {
+  const listeners = {};
+  const input = new InputController({
+    eventTarget: {
+      addEventListener: (name, callback) => {
+        listeners[name] = callback;
+      },
+    },
+    logger,
+  });
+  return {
+    input,
+    key(code, down = true, target = null) {
+      listeners[down ? "keydown" : "keyup"]({
+        code,
+        repeat: false,
+        target,
+        preventDefault() {},
+      });
+    },
+    blur: () => listeners.blur(),
+  };
+}
+test("two keyboard slots reserve P1/P2 and one controller joins P3, including replacement", () => {
+  const assignments = new GamepadAssignments();
+  assignments.configure(3, 2);
+  const p = pad(5);
+  const joined = joinAll(assignments, [p]);
+  assert.deepEqual(joined.joined, [2]);
+  assert.equal(joined.ready, true);
+  assert.deepEqual(
+    joined.status.map((s) => s.keyboardIndex),
+    [0, 1, null],
+  );
+  assert.deepEqual(
+    joined.status.map((s) => s.index),
+    [null, null, 5],
+  );
+  p.connected = false;
+  assert.deepEqual(assignments.update([p]).lost, [2]);
+  const replacement = pad(2, "Replacement");
+  assert.equal(joinAll(assignments, [replacement]).ready, true);
+  assert.equal(assignments.getStatus([replacement])[2].index, 2);
+});
+test("two keyboard players can race without any controllers and switching setup releases reserved pad bindings", () => {
+  const a = new GamepadAssignments();
+  a.configure(2, 0);
+  joinAll(a, [pad(0), pad(1)]);
+  a.configure(2, 2);
+  assert.equal(a.update([]).ready, true);
+  assert.deepEqual(a.bindings, [null, null, null, null]);
+  a.configure(2, 0);
+  assert.equal(a.update([]).ready, false);
+  a.configure(3, 99);
+  assert.equal(a.keyboardPlayers, 2);
+});
+test("two keyboard sets and the controller steer, brake and accelerate independently", () => {
+  const { input, key, blur } = keyboardHarness(),
+    pads = [pad(5)];
+  input.configure(2, true);
+  const controls = new LocalControllers({ getPads: () => pads, logger });
+  controls.configure(3, 2);
+  press(pads[0], 0);
+  controls.sample(input.getStates(), { allowJoin: true });
+  press(pads[0], 0, 0);
+  key("KeyW");
+  key("KeyA");
+  key("ArrowDown");
+  key("ArrowRight");
+  key("ShiftRight");
+  press(pads[0], 7, 0.6);
+  pads[0].axes[0] = 0.4;
+  const states = controls.sample(input.getStates());
+  assert.equal(states[0].throttleAxis, 1);
+  assert.equal(states[0].brakeAxis, 0);
+  assert.equal(states[0].steerAxis, 1);
+  assert.equal(states[0].handbrake, false);
+  assert.equal(states[1].throttleAxis, 0);
+  assert.equal(states[1].brakeAxis, 1);
+  assert.equal(states[1].steerAxis, -1);
+  assert.equal(states[1].handbrake, true);
+  assert.equal(states[2].throttleAxis, 0.6);
+  assert.ok(states[2].steerAxis < -0.3 && states[2].steerAxis > -0.4);
+  key("KeyW", false);
+  key("ArrowDown", false);
+  assert.ok(input.getStates().every((s) => !s.forward && !s.backward));
+  blur();
+  assert.ok(input.getStates().every((s) => Object.values(s).every((v) => !v)));
+});
+test("local arrow pedals never shift P1; each keyboard has its own camera and solo arrows still shift", () => {
+  const { input, key } = keyboardHarness(),
+    cameras = [],
+    shifts = [];
+  input.onToggleCamera = (i) => cameras.push(i);
+  input.onShiftUp = (i) => shifts.push(i);
+  input.configure(2, true);
+  key("ArrowUp");
+  key("KeyC");
+  key("Enter");
+  key("Period");
+  assert.deepEqual(cameras, [0, 1]);
+  assert.deepEqual(shifts, [1]);
+  input.configure(0, true);
+  key("KeyW");
+  key("ArrowUp");
+  key("KeyC");
+  key("Enter");
+  assert.deepEqual(input.getStates(), [{}, {}]);
+  assert.deepEqual(cameras, [0, 1]);
+  input.configure(1, false);
+  key("ArrowUp");
+  assert.deepEqual(shifts, [1, 0]);
+  assert.equal(input.getState().forward, false);
+});
+test("keyboard key-up clears held controls even after focus moves into setup", () => {
+  const { input, key } = keyboardHarness();
+  input.configure(2, true);
+  key("ArrowUp");
+  key("ArrowUp", false, { closest: () => ({}) });
+  assert.equal(input.getState(1).forward, false);
 });

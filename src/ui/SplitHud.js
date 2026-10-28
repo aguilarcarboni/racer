@@ -1,3 +1,4 @@
+import { KEYBOARD_PROFILES } from "../core/KeyboardProfiles.js";
 import { formatTime } from "./Hud.js";
 const place = (node, r) => {
   Object.assign(node.style, {
@@ -76,8 +77,13 @@ export class SplitHud {
         lap = entry.laps.getState(),
         refs = this.panels[i].refs,
         controller = status[i];
-      refs.controller.textContent = controller?.keyboard
-        ? "KEYBOARD"
+      const profile = controller?.keyboard
+        ? KEYBOARD_PROFILES[controller.keyboardIndex]
+        : null;
+      this.panels[i].panel.querySelector(".player-camera kbd").textContent =
+        profile ? profile.cameraLabel : "Y / Triangle";
+      refs.controller.textContent = profile
+        ? profile.label.toUpperCase()
         : controller?.connected
           ? `CONTROLLER ${controller.index + 1}`
           : "CONTROLLER NEEDED";
@@ -108,7 +114,7 @@ export class SplitHud {
             ? race.countdown
             : race.phase === "ready"
               ? controller?.keyboard
-                ? "W TO START"
+                ? profile.start
                 : "RT / R2 TO START"
               : "";
       refs.countdown.classList.toggle(

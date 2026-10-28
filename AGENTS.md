@@ -273,7 +273,7 @@ For responsive steering, keep axle-force balance separate from input response. T
 
 ## Local multiplayer contract
 
-Solo remains keyboard + first pad. Local mode requires one unique controller per human unless keyboard P1 is explicitly selected. Join by bottom face-button edge, preserve original browser gamepad indices (including sparse arrays and equal IDs), and prime held buttons on join/reconnect so A does not change gear and held Start cannot resume. A missing pad must never silently control another car. Any local disconnect pauses the whole running race and neutralizes missing input.
+Solo remains keyboard + first pad. Local mode reserves zero, one or two keyboard seats at P1/P2 and requires one unique controller for each remaining human. KeyboardProfiles centralizes the two physical-key maps, labels and count validation. Preserve P1 WASD/Space/C and P2 arrows/Right Shift/Enter, independent camera/shift actions and blur/key-up clearing. Solo arrows shift; local arrows never shift P1. Join by bottom face-button edge, preserve original browser gamepad indices (including sparse arrays and equal IDs), and prime held buttons on join/reconnect so A does not change gear and held Start cannot resume. A missing pad must never silently control another car. Any local disconnect pauses the whole running race and neutralizes missing input.
 
 RaceField promotes its existing cars to human slots and fills only unused places with AI. Local humans inherit the host setup; solo AI retains defaults. Finish classification must wait for all human players while preserving individual finish times. R restarts the race; mode/input changes start a fresh race. Keep simulation ordering shared at 120 Hz.
 

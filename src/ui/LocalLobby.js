@@ -1,3 +1,5 @@
+import { KEYBOARD_PROFILES } from "../core/KeyboardProfiles.js";
+
 export class LocalLobby {
   constructor({ onCount, onKeyboard, onLayout, onStart, onPreview, onSolo }) {
     this.root = document.getElementById("local-lobby");
@@ -13,8 +15,8 @@ export class LocalLobby {
       }),
     );
     document
-      .getElementById("keyboard-player-one")
-      .addEventListener("change", (e) => onKeyboard(e.target.checked));
+      .getElementById("keyboard-players")
+      .addEventListener("change", (e) => onKeyboard(Number(e.target.value)));
     document
       .getElementById("split-orientation")
       .addEventListener("change", (e) => onLayout(e.target.value));
@@ -59,7 +61,7 @@ export class LocalLobby {
   hide() {
     this.visible = false;
     this.root.hidden = true;
-    document.getElementById("local-race").focus();
+    document.getElementById("app").focus();
   }
   configure(players, keyboard, orientation) {
     this.players = players;
@@ -79,7 +81,7 @@ export class LocalLobby {
           String(Number(b.dataset.playerCount) === players.length),
         ),
       );
-    document.getElementById("keyboard-player-one").checked = keyboard;
+    document.getElementById("keyboard-players").value = String(keyboard);
     document.getElementById("split-orientation").value = orientation;
     document.getElementById("orientation-field").hidden = players.length !== 2;
     this.lastSignature = "";
@@ -102,7 +104,7 @@ export class LocalLobby {
             ? "Reconnect controller"
             : "Press A / Cross to join";
       card.querySelector(".slot-device").textContent = state?.keyboard
-        ? "WASD + Space"
+        ? KEYBOARD_PROFILES[state.keyboardIndex].label
         : state?.connected
           ? `Pad ${state.index + 1} / ${state.name}`
           : "One controller per player";

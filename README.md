@@ -45,7 +45,16 @@ Two players can choose side-by-side or top-and-bottom views. Three players get t
 | Start / Options       | Start from the ready lobby; pause/resume during a race               |
 | A / Cross, B / Circle | Manual up/down shifts during play; joining is ignored by the gearbox |
 
-**Use keyboard for Player 1** allows a mixed keyboard/controller game. Otherwise each local player needs a separate controller. Spare grid spots stay AI-controlled: two humans race two AI, three race one AI, and four race each other. The host's car setup is shared by local humans; AI retains its default setup. Changing player count or keyboard assignment starts a fresh race. Layout changes preserve the race. The race stays active until every human finishes three laps, with individual finish order retained.
+**Keyboard players** selects zero, one or two keyboard seats. For two people sharing the keyboard plus one controller, choose **3 players**, **2 - Players 1 and 2**, then press **A / Cross** on the controller to join as Player 3. Two keyboard players can also race together without any controller.
+
+| Keyboard | Drive      | Handbrake   | Camera | Manual up / down |
+| -------- | ---------- | ----------- | ------ | ---------------- |
+| Player 1 | WASD       | Space       | C      | E / Q            |
+| Player 2 | Arrow keys | Right Shift | Enter  | Period / Comma   |
+
+Escape pauses everyone; R restarts. Local arrow keys drive Player 2 and never shift Player 1. Solo retains its arrow-key manual shifts. Keyboard rollover depends on the hardware, so simultaneous keys should be checked on your shared keyboard.
+
+Spare grid spots stay AI-controlled: two humans race two AI, three race one AI, and four race each other. The host's car setup is shared by local humans; AI retains its default setup. Changing player count or keyboard assignment starts a fresh race. Layout changes preserve the race. The race stays active until every human finishes three laps, with individual finish order retained.
 
 A disconnected controller neutralizes that player's input and pauses the whole local race. Reconnect it, or press A / Cross on a replacement; other players keep their assignments. Press Start / Options or Resume race after everyone is ready. A held Start button on reconnection does not silently resume.
 
@@ -110,7 +119,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 60 behavior tests, including controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 65 behavior tests, including mixed two-keyboard/one-pad isolation, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

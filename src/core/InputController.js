@@ -1,6 +1,10 @@
+import { KEYBOARD_PROFILES, getKeyboardCount } from "./KeyboardProfiles.js";
+
 export class InputController {
-  constructor() {
-    this.keys = { w: false, a: false, s: false, d: false, " ": false };
+  constructor({ eventTarget = window, logger = console } = {}) {
+    this.logger = logger;
+    this.keys = new Set();
+    this.configure(1, false);
     this.onReset = null;
     this.onToggleCamera = null;
     this.onShiftUp = null;
@@ -9,51 +13,74 @@ export class InputController {
     this.onPause = null;
     this.onToggleTransmission = null;
     this.onToggleGuide = null;
-    window.addEventListener("keydown", (e) => this.key(e, true));
-    window.addEventListener("keyup", (e) => this.key(e, false));
-    window.addEventListener("blur", () => this.clear());
-    console.info(
-      "[Input:init] W/S throttle/brake + reverse; A/D steer; Space handbrake; arrows shift; G gearbox; C camera; L line; R reset; Escape pause",
+    eventTarget.addEventListener("keydown", (e) => this.key(e, true));
+    eventTarget.addEventListener("keyup", (e) => this.key(e, false));
+    eventTarget.addEventListener("blur", () => this.clear());
+    this.logger.info(
+      "[Input:init] P1 WASD/Space/C; P2 arrows/Right Shift/Enter; Escape pause; R reset",
     );
   }
+  configure(keyboardPlayers, local) {
+    this.local = local;
+    this.keyboardPlayers = getKeyboardCount(local ? 4 : 1, keyboardPlayers);
+    this.clear();
+  }
   key(event, down) {
-    if (event.target.closest("input,textarea,select")) return;
-    const key = event.key.toLowerCase();
-    if ([" ", "arrowup", "arrowdown", "escape"].includes(key))
-      event.preventDefault();
+    if (down && event.target?.closest?.("input,textarea,select")) return;
+    const code = event.code;
+    if (
+      down &&
+      ["Space", "Enter"].includes(code) &&
+      event.target?.closest?.("button")
+    )
+      return;
+    const profiles = KEYBOARD_PROFILES.slice(0, this.keyboardPlayers);
+    const globalAction = {
+      KeyR: "onReset",
+      Escape: "onPause",
+      KeyL: "onToggleGuide",
+    }[code];
+    const used =
+      globalAction ||
+      profiles.some((p) => p.keys[code] || p.actions[code]) ||
+      (!this.local && ["ArrowUp", "ArrowDown"].includes(code));
+    if (!used) return;
+    event.preventDefault();
     if (event.repeat) return;
-    if (key in this.keys) {
-      this.keys[key] = down;
-      console.info(down ? "[Input:key-down]" : "[Input:key-up]", { key });
-      this.onTelemetry?.({
-        event: down ? "key-down" : "key-up",
-        key,
-        state: this.getState(),
-      });
-    }
-    if (down) {
-      const map = {
-        r: "onReset",
-        c: "onToggleCamera",
-        arrowup: "onShiftUp",
-        arrowdown: "onShiftDown",
-        escape: "onPause",
-        g: "onToggleTransmission",
-        l: "onToggleGuide",
-      };
-      if (map[key]) this[map[key]]?.();
-    }
+    if (down) this.keys.add(code);
+    else this.keys.delete(code);
+    profiles.forEach((profile, index) => {
+      if (profile.keys[code]) {
+        this.logger.info(down ? "[Input:key-down]" : "[Input:key-up]", {
+          key: code,
+          player: index + 1,
+        });
+        this.onTelemetry?.({
+          event: down ? "key-down" : "key-up",
+          key: code,
+          player: index + 1,
+          state: this.getState(index),
+        });
+      }
+      if (down && profile.actions[code]) this[profile.actions[code]]?.(index);
+    });
+    if (down && !this.local && ["ArrowUp", "ArrowDown"].includes(code))
+      this[code === "ArrowUp" ? "onShiftUp" : "onShiftDown"]?.(0);
+    if (down && globalAction) this[globalAction]?.();
   }
   clear() {
-    for (const k in this.keys) this.keys[k] = false;
+    this.keys.clear();
   }
-  getState() {
-    return {
-      forward: this.keys.w,
-      backward: this.keys.s,
-      left: this.keys.a,
-      right: this.keys.d,
-      handbrake: this.keys[" "],
-    };
+  getState(index = 0) {
+    if (index >= this.keyboardPlayers) return {};
+    return Object.fromEntries(
+      Object.entries(KEYBOARD_PROFILES[index].keys).map(([code, action]) => [
+        action,
+        this.keys.has(code),
+      ]),
+    );
+  }
+  getStates() {
+    return KEYBOARD_PROFILES.map((_, i) => this.getState(i));
   }
 }
