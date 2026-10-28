@@ -17,7 +17,7 @@ export class InputController {
     eventTarget.addEventListener("keyup", (e) => this.key(e, false));
     eventTarget.addEventListener("blur", () => this.clear());
     this.logger.info(
-      "[Input:init] P1 WASD/Space/C; P2 arrows/Right Shift/Enter; Escape pause; R reset",
+      "[Input:init] P1 WASD/Space/C; maximum one keyboard player; Escape pause; R reset",
     );
   }
   configure(keyboardPlayers, local) {

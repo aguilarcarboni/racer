@@ -45,14 +45,9 @@ Two players can choose side-by-side or top-and-bottom views. Three players get t
 | Start / Options       | Start from the ready lobby; pause/resume during a race               |
 | A / Cross, B / Circle | Manual up/down shifts during play; joining is ignored by the gearbox |
 
-**Keyboard players** selects zero, one or two keyboard seats. For two people sharing the keyboard plus one controller, choose **3 players**, **2 - Players 1 and 2**, then press **A / Cross** on the controller to join as Player 3. Two keyboard players can also race together without any controller.
+**Keyboard player** selects either all controllers or keyboard Player 1. At most one player uses the keyboard; up to three others use separate controllers. For two players and one controller, choose **2 players**, **1 - Player 1**, then press **A / Cross** on the controller to join as Player 2.
 
-| Keyboard | Drive      | Handbrake   | Camera | Manual up / down |
-| -------- | ---------- | ----------- | ------ | ---------------- |
-| Player 1 | WASD       | Space       | C      | E / Q            |
-| Player 2 | Arrow keys | Right Shift | Enter  | Period / Comma   |
-
-Escape pauses everyone; R restarts. Local arrow keys drive Player 2 and never shift Player 1. Solo retains its arrow-key manual shifts. Keyboard rollover depends on the hardware, so simultaneous keys should be checked on your shared keyboard.
+Keyboard P1 uses WASD to drive, Space for handbrake, C for camera, and E/Q for manual shifts in local mode. Solo also retains arrow-key manual shifts. Escape pauses everyone and R restarts. Arrow keys and Enter cannot control another local car.
 
 Spare grid spots stay AI-controlled: two humans race two AI, three race one AI, and four race each other. The host's car setup is shared by local humans; AI retains its default setup. Changing player count or keyboard assignment starts a fresh race. Layout changes preserve the race. The race stays active until every human finishes three laps, with individual finish order retained.
 
@@ -120,7 +115,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 72 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed two-keyboard/one-pad isolation, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 72 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed one-keyboard/three-pad isolation and the one-keyboard cap, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

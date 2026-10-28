@@ -161,10 +161,7 @@ export class Game {
     this.advance.reset();
     this.players = this.race.getPlayers();
     document.body.dataset.keyboardPlayers = this.keyboardPlayers;
-    const hints = [
-      "P1 WASD / Space / C",
-      "P2 arrows / Right Shift / Enter",
-    ].slice(0, this.keyboardPlayers);
+    const hints = ["P1 WASD / Space / C"].slice(0, this.keyboardPlayers);
     if (this.playerCount > this.keyboardPlayers)
       hints.push("Pad stick / triggers / Y");
     document.querySelector(".local-controls").textContent =
