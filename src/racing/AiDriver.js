@@ -16,6 +16,19 @@ export class AiDriver {
     this.recovery = 0;
     this.debug = {};
   }
+  saveState() {
+    return {
+      lane: this.lane,
+      targetLane: this.targetLane,
+      passTime: this.passTime,
+      stuckTime: this.stuckTime,
+      recovery: this.recovery,
+      debug: this.debug,
+    };
+  }
+  restoreState(state) {
+    Object.assign(this, state);
+  }
   getInput(state, traffic, dt) {
     const near = this.layout.nearest(state.position),
       q = state.quaternion;

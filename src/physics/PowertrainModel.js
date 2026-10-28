@@ -18,6 +18,12 @@ export class PowertrainModel {
     if (this.automatic && this.gear === 0) this.gear = 1;
   }
   update(speed, input, dt) {
+    // A paused or disconnected online driver brakes without requesting reverse.
+    if (input.parked) {
+      this.reverseTimer = 0;
+      this.throttle = 0;
+      return { drive: 0, brake: 1, throttle: 0 };
+    }
     let throttle = clamp(input.throttleAxis, 0, 1),
       brake = clamp(input.brakeAxis, 0, 1);
     if (this.automatic) {
@@ -56,6 +62,17 @@ export class PowertrainModel {
       brake,
       throttle,
     };
+  }
+  saveState() {
+    return {
+      gear: this.gear,
+      automatic: this.automatic,
+      reverseTimer: this.reverseTimer,
+      throttle: this.throttle,
+    };
+  }
+  restoreState(state) {
+    Object.assign(this, state);
   }
   getState(speed) {
     const normalized = clamp(

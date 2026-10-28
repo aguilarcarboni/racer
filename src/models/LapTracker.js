@@ -46,6 +46,12 @@ export class LapTracker {
     this.previous = progress;
     return this.getState();
   }
+  saveState() {
+    return { ...this };
+  }
+  restoreState(state) {
+    Object.assign(this, state);
+  }
   getState() {
     return {
       elapsed: this.started ? this.time - this.lapStart : 0,

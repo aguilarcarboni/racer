@@ -51,16 +51,23 @@ export class CarView {
       (error) => console.error("[Car:model-load-failed]", error),
     );
   }
-  sync(body, vehicle, steer, dt = 0) {
-    const offset = new THREE.Vector3(0, -0.62, 0).applyQuaternion(
-      body.quaternion,
-    );
+  sync(body, vehicle, steer, dt = 0, pose = null) {
+    const position = pose ? { x: pose.x, y: pose.y, z: pose.z } : body.position;
+    const quaternion = pose
+      ? new THREE.Quaternion(
+          pose.quaternion.x,
+          pose.quaternion.y,
+          pose.quaternion.z,
+          pose.quaternion.w,
+        )
+      : body.quaternion;
+    const offset = new THREE.Vector3(0, -0.62, 0).applyQuaternion(quaternion);
     this.root.position.set(
-      body.position.x + offset.x,
-      body.position.y + offset.y,
-      body.position.z + offset.z,
+      position.x + offset.x,
+      position.y + offset.y,
+      position.z + offset.z,
     );
-    this.root.quaternion.copy(body.quaternion);
+    this.root.quaternion.copy(quaternion);
     const forward = body.vectorToLocalFrame(body.velocity);
     this.wheelRig?.sync(vehicle, steer, forward.z, dt);
   }

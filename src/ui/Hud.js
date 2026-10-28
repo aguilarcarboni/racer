@@ -19,7 +19,16 @@ export class Hud {
       const row = document.createElement("div");
       row.className = "standing-row";
       row.id = `standing-${entry.id}`;
-      row.innerHTML = `<span class="standing-rank">${entry.rank}</span><i style="background:${entry.color}"></i><strong>${entry.name}</strong><small>${entry.isPlayer ? "YOU" : "AI"}</small>`;
+      row.innerHTML =
+        '<span class="standing-rank"></span><i></i><strong></strong><small></small>';
+      row.querySelector(".standing-rank").textContent = entry.rank;
+      row.querySelector("i").style.background = entry.color;
+      row.querySelector("strong").textContent = entry.name;
+      row.querySelector("small").textContent = entry.isPlayer
+        ? "YOU"
+        : entry.online
+          ? "PLAYER"
+          : "AI";
       body.append(row);
       if (!entry.isPlayer) {
         const dot = document.createElementNS(

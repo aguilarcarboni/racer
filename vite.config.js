@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { onlineDevPlugin } from "./src/server/LocalRoomServer.js";
 export default defineConfig({
   server: {
     host: "127.0.0.1",
@@ -7,6 +8,7 @@ export default defineConfig({
     watch: { usePolling: true, interval: 350 },
   },
   plugins: [
+    onlineDevPlugin(),
     {
       name: "client-log-bridge",
       configureServer(server) {

@@ -42,15 +42,37 @@ export class RaceSession {
         entry.isPlayer &&
         this.standings
           .filter((e) => e.isPlayer)
-          .every((e) => e.finishedAt !== null)
+          .every((e) => e.dnf || e.finishedAt !== null)
       )
         this.phase = "finished";
     }
+  }
+  saveState() {
+    return {
+      phase: this.phase,
+      countdown: this.countdown,
+      elapsed: this.elapsed,
+      standings: structuredClone(this.standings),
+    };
+  }
+  restoreState(state) {
+    Object.assign(this, structuredClone(state));
+  }
+  withdraw(id) {
+    const entry = this.standings.find((e) => e.id === id);
+    if (entry && entry.finishedAt === null) entry.dnf = true;
+    this.checkFinished();
+  }
+  checkFinished() {
+    const humans = this.standings.filter((e) => e.isPlayer);
+    if (humans.length && humans.every((e) => e.dnf || e.finishedAt !== null))
+      this.phase = "finished";
   }
   getSnapshot(playerId) {
     const entries = this.standings
       .slice()
       .sort((a, b) => {
+        if (!!a.dnf !== !!b.dnf) return a.dnf ? 1 : -1;
         if (a.finishedAt !== null && b.finishedAt !== null)
           return a.finishedAt - b.finishedAt || a.slot - b.slot;
         if (a.finishedAt !== null) return -1;

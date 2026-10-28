@@ -2,7 +2,7 @@ import { RacingLineProfile } from "../racing/RacingLineProfile.js";
 import { RacingLineView } from "../view/RacingLineView.js";
 import { RACE } from "../racing/RaceConfig.js";
 import * as THREE from "three";
-import * as CANNON from "cannon-es";
+import { TrackCollisions } from "../physics/TrackCollisions.js";
 import { TrackLayout } from "./TrackLayout.js";
 import { Terrain } from "../physics/Terrain.js";
 import { Environment, material, box, label } from "../view/Environment.js";
@@ -20,7 +20,10 @@ export class Track {
     scene.add(this.root);
   }
   create(world, groundMaterial) {
-    this.terrain.createBody(world, groundMaterial);
+    new TrackCollisions(this.layout, this.terrain).create(
+      world,
+      groundMaterial,
+    );
     this.environment = new Environment(this.scene, this.terrain, this.layout);
     this.strip(-11, 11, 0.01, material("#c5b799", 0.99));
     this.strip(-7.25, 7.25, 0.025, material("#515851", 0.96));
@@ -47,14 +50,6 @@ export class Track {
     for (const side of [-1, 1]) {
       this.strip(side * 5.77, side * 5.88, 0.047, material("#e8e7d8"));
       const curb = this.strip(side * 6, side * 7.2, 0.105, null, true);
-      const shape = new CANNON.Trimesh(
-        Array.from(curb.geometry.attributes.position.array),
-        Array.from(curb.geometry.index.array),
-      );
-      const body = new CANNON.Body({ mass: 0, material: groundMaterial });
-      body.addShape(shape);
-      body.updateAABB();
-      world.addBody(body);
       this.guardrail(side, world, groundMaterial);
     }
     this.startFinish();
@@ -155,14 +150,6 @@ export class Track {
         m.rotation.y = Math.atan2(cx - ax, cz - az);
         m.castShadow = false;
       }
-      const body = new CANNON.Body({ mass: 0, material: groundMaterial });
-      body.addShape(
-        new CANNON.Box(new CANNON.Vec3(0.12, 0.45, length / 2 + 0.12)),
-      );
-      body.position.set((ax + cx) / 2, (ay + cy) / 2 + 0.45, (az + cz) / 2);
-      body.quaternion.setFromEuler(0, Math.atan2(cx - ax, cz - az), 0);
-      body.updateAABB();
-      world.addBody(body);
     }
     this.root.add(posts);
   }

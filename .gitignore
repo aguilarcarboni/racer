@@ -17,3 +17,8 @@ playground-temp
 temp
 TODOs.md
 .eslintcache
+
+.sites-build/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

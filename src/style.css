@@ -1643,3 +1643,179 @@ h2 {
     margin-top: 8px;
   }
 }
+
+/* Online rooms share the offline lobby's visual language. */
+#online-connection {
+  font:
+    11px "DM Sans",
+    sans-serif;
+  color: #c6d4c2;
+  font-variant-numeric: tabular-nums;
+}
+.online-panel {
+  max-width: 560px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.online-field {
+  display: grid;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  margin: 18px 0 12px;
+}
+.online-field input {
+  min-height: 46px;
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #ffffff25;
+  border-radius: 6px;
+  color: #f4f0df;
+  background: #122d23;
+  padding: 0 14px;
+  font:
+    15px "DM Sans",
+    sans-serif;
+}
+#online-code {
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+}
+.online-panel button {
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid #ffffff20;
+  padding: 10px 16px;
+  color: #f4f0df;
+  background: #29483b;
+  font:
+    12px "DM Sans",
+    sans-serif;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    transform 0.1s;
+}
+.online-panel button:active {
+  transform: scale(0.96);
+}
+.online-panel button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.online-panel .online-primary {
+  background: #e8bf8c;
+  color: #203b30;
+  border-color: transparent;
+}
+#online-create,
+#online-join {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#online-create span {
+  opacity: 0.7;
+  font-size: 10px;
+}
+.online-divider {
+  text-align: center;
+  color: #9fb4a6;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  margin: 22px 0 8px;
+}
+.online-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+}
+.online-invite small {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #b9c8b7;
+}
+.online-invite strong {
+  display: block;
+  font-size: 36px;
+  letter-spacing: 0.15em;
+  color: #e8bf8c;
+  user-select: all;
+  font-variant-numeric: tabular-nums;
+}
+.online-roster {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.online-player {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border-left: 3px solid var(--player-color);
+  border-radius: 5px;
+  background: #132e24;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.online-player strong {
+  overflow-wrap: anywhere;
+}
+.online-player span {
+  color: #b6c7b6;
+  font-size: 10px;
+  text-align: right;
+}
+.online-race-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.online-race-actions #online-ready[aria-pressed="true"] {
+  background: #477654;
+}
+.online-panel .online-leave {
+  background: transparent;
+  border: 0;
+  color: #c2ccbc;
+  margin-top: 12px;
+}
+.online-results {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+  margin: 20px 0;
+}
+.online-mode .setup,
+.online-mode #reset {
+  display: none;
+}
+.online-mode #online-pause-hint {
+  max-width: 28ch;
+  font:
+    14px/1.6 "DM Sans",
+    sans-serif;
+  color: #d8dfcb;
+  text-align: center;
+}
+.online-panel [hidden] {
+  display: none !important;
+}
+@media (max-width: 700px) {
+  #online-connection {
+    display: none;
+  }
+  .online-panel {
+    padding: 24px;
+  }
+  #online-create span {
+    display: none;
+  }
+}

@@ -230,6 +230,24 @@ export class VehicleDynamics {
       grounded,
     };
   }
+  saveState() {
+    return {
+      steer: this.steer,
+      lastAccel: this.lastAccel,
+      lastLateral: this.lastLateral,
+      debug: { ...this.debug },
+      tuning: { ...this.tuning },
+      engine: this.powertrain.saveState(),
+    };
+  }
+  restoreState(state) {
+    this.steer = state.steer;
+    this.lastAccel = state.lastAccel;
+    this.lastLateral = state.lastLateral;
+    this.debug = { ...state.debug };
+    this.setTuning(state.tuning);
+    this.powertrain.restoreState(state.engine);
+  }
   getState(speed) {
     return {
       ...this.debug,

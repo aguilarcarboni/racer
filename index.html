@@ -22,7 +22,9 @@
       >
       <div class="session-name"><i></i> CLUB RACE <span>01 / VALLE</span></div>
       <div class="header-actions">
-        <button id="local-race">Local race <kbd>1-4</kbd></button
+        <span id="online-connection" hidden></span
+        ><button id="local-race">Offline <kbd>1-4</kbd></button
+        ><button id="online-race">Online</button
         ><button id="camera">View <kbd>C</kbd></button
         ><button id="pause">Pause <kbd>ESC</kbd></button>
       </div>
@@ -216,6 +218,9 @@
     <div class="pause-screen" id="pause-screen" hidden>
       <span class="eyebrow">THE CIRCUIT CAN WAIT.</span>
       <h2>Take a breath.</h2>
+      <p id="online-pause-hint" hidden>
+        The online race continues. Your car is braking.
+      </p>
       <button id="resume">Back to the track <kbd>ESC</kbd></button>
     </div>
     <div id="split-hud" hidden></div>
@@ -282,6 +287,83 @@
           ><button id="local-preview">View grid</button
           ><button id="local-start" disabled>Start local race</button>
         </div>
+      </div>
+    </section>
+    <section
+      id="online-lobby"
+      class="local-lobby"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="online-title"
+      hidden
+    >
+      <div class="lobby-panel online-panel">
+        <div class="lobby-eyebrow">
+          <span>ONLINE MULTIPLAYER</span><b>UP TO 4 PLAYERS</b>
+        </div>
+        <h2 id="online-title" tabindex="-1">Race together.</h2>
+        <p class="lobby-intro">
+          One player per device. Create a lobby and share its code, or join your
+          friends.
+        </p>
+        <div id="online-entry">
+          <label class="online-field"
+            >YOUR NAME<input
+              id="online-name"
+              maxlength="18"
+              autocomplete="nickname"
+              placeholder="Racer"
+          /></label>
+          <button id="online-create" class="online-primary">
+            Create lobby <span>Get a code to share</span>
+          </button>
+          <div class="online-divider"><span>OR JOIN FRIENDS</span></div>
+          <label class="online-field"
+            >LOBBY CODE<input
+              id="online-code"
+              maxlength="6"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              placeholder="ABC234"
+          /></label>
+          <button id="online-join" class="online-secondary">
+            Join with code
+          </button>
+        </div>
+        <div id="online-room" hidden>
+          <div class="online-invite">
+            <div>
+              <small>LOBBY CODE</small><strong id="online-room-code"></strong>
+            </div>
+            <button id="online-copy">Copy invite link</button>
+          </div>
+          <p id="online-room-status" class="local-message"></p>
+          <div id="online-roster" class="online-roster"></div>
+          <div id="online-results" class="online-results" hidden></div>
+          <div class="online-race-actions">
+            <button id="online-ready" aria-pressed="false">I'm ready</button
+            ><button id="online-start" class="online-primary" disabled>
+              Start race</button
+            ><button id="online-rematch" class="online-primary" hidden>
+              Another round</button
+            ><button id="online-watch" hidden>View race</button>
+          </div>
+          <button id="online-leave" class="online-leave">Leave lobby</button>
+        </div>
+        <p
+          id="online-message"
+          class="local-message"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <p class="lobby-note">
+          Keyboard or controller. Automatic gears. Offline solo and local
+          split-screen remain available.
+        </p>
+        <button id="online-offline" class="online-leave">
+          Back to offline
+        </button>
       </div>
     </section>
     <footer>

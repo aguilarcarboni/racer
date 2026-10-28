@@ -29,6 +29,32 @@ Automatic gears are on initially. The arrow guide follows the center of the road
 
 A standard gamepad uses the left stick to steer, triggers to accelerate/brake, the top face button for camera, the left face button for handbrake, and bottom/right face buttons for shifting. Start / Options pauses or resumes the shared race. Four-physical-controller acceptance is still pending; automated coverage uses independent controller snapshots and the physical car model.
 
+## Online racing
+
+Choose **Online** to create a lobby or join with a six-character code. Each browser/device gets one car and uses keyboard or a controller. The host shares the code or invite link; every player clicks **I'm ready**, then the host clicks **Start race**. Rooms allow two to four human players, with AI filling spare grid spots. Online play is full-screen per device. **Offline** retains solo and local split-screen, with at most one keyboard player.
+
+The dedicated Node/WebSocket server owns physics, collisions, lap gates, classification and the shared countdown. Browsers send controls at 20 Hz, predict their own car and interpolate remote cars. The physical world advances at 120 Hz; clients never submit positions or lap results. HTTP handles lobby actions and reconnect fallback; race updates stream without a database round trip. The frontend remains on ChatGPT Sites.
+
+A player can rejoin with its saved session after a reload. Input silence brakes after 700 ms without engaging reverse. Disconnected players have a 30-second grace period before DNF; leaving transfers host control. Online pause/menu access brakes only that player's car. The host can start another round after everyone finishes or withdraws. Rooms expire after 30 minutes of inactivity. Session tokens are hashed server-side and never included in other players' views or logs.
+
+This is an online prototype: latency/packet loss can cause corrections, and four physical devices on separate networks still need a group playtest. Rooms live in one server process and reset when the server restarts or a new revision is deployed. Keep a single active instance until a room-routing/shared-state service is implemented. The server bounds its room count to 16; this is intended for small friend groups, not a public matchmaking service.
+
+`npm run dev` includes the same real-time room service on Vite's HTTP/WebSocket server. `npm run server` runs the standalone server on port 8080; `PORT` and comma-separated `ALLOWED_ORIGINS` configure it. Tests retain a real SQLite adapter to check the legacy storage contract. The production Sites Worker serves bundled assets and forwards legacy HTTP room requests; the current browser connects directly to the dedicated server. Applied D1 migrations remain unchanged for deployment history, but D1 is outside the real-time loop.
+
+Hosting: Google Cloud project `eaglenest-507101`, service `racer-online`, region `us-central1`. `racer-build` has Cloud Run Builder; `racer-runtime` has no project resource roles. The service scales from zero to one instance, with a one-hour WebSocket request timeout and client reconnect. The public endpoint is tracked in `src/online/ServerConfig.js`. Production static builds use it; development stays on the local server.
+
+```sh
+gcloud run deploy racer-online --source=. --region=us-central1 \
+  --project=eaglenest-507101 --account=aguilarcarboni@gmail.com \
+  --build-service-account=projects/eaglenest-507101/serviceAccounts/racer-build@eaglenest-507101.iam.gserviceaccount.com \
+  --service-account=racer-runtime@eaglenest-507101.iam.gserviceaccount.com \
+  --allow-unauthenticated --min-instances=0 --max-instances=1 \
+  --concurrency=80 --timeout=3600 --cpu=1 --memory=512Mi --session-affinity \
+  --set-env-vars=ALLOWED_ORIGINS=https://racer-valle-motor-park.aguilarcarboni173810.chatgpt.site
+```
+
+Current short hosted four-client measurement: 162 ms median round trip and about 3.7 GiB outbound per full-lobby hour. At current Google compute/network rates, a planning estimate is US$0.45-0.80 per four-player hour before any available free allowances; destination, usage and build/storage charges affect the bill. This is an estimate, not a spending cap. Payload reduction is a future optimization.
+
 ## Local split screen
 
 Open **Local race**, choose **2, 3 or 4 players**, and press **A / Cross** on each controller to claim a player. Once every slot is ready, click **Start local race** or press **Start / Options** for the countdown. Solo remains the default; **Back to solo** returns to its full-screen race. **View grid** previews the layout while waiting for controllers and keeps the cars parked.
@@ -71,7 +97,7 @@ The goal is approachable, believable arcade handling: progressive grip, useful b
 - Surface grip and drag change off the asphalt. Contact is required for tire traction, so throttle cannot steer or accelerate an airborne chassis through tire force.
 - Fixed 120 Hz physics; rendering follows model state. A hidden tab pauses. Long frame stalls are capped to avoid runaway catch-up, which can slow simulation under heavy load.
 
-This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model, online multiplayer or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
+This is a simcade prototype. It has no measured real-car tire data, full drivetrain/clutch simulation, tire temperature/wear, fuel, damage model or force-feedback wheel integration. Suspension and grip require human playtesting, especially on curbs. The spring/damper constants are calibrated for playability rather than a specific licensed car.
 
 ## Club race
 
@@ -93,6 +119,10 @@ The lap timer starts at the gantry. Ordered quarter-lap checkpoints prevent a sh
 - `src/physics/TireModel.js`: smooth friction-circle tire saturation.
 - `src/physics/PowertrainModel.js`: gear selection, drive force, braking and reverse.
 - `src/physics/VehicleConfig.js`: dimensions, physical constants and defaults.
+- `src/physics/PhysicsCar.js`: render-free vehicle composition shared by offline and online.
+- `src/physics/TrackCollisions.js`: shared physical terrain, curb and rail geometry.
+- `src/online/`: room client, prediction/reconciliation and snapshot presentation.
+- `src/server/`: authoritative simulation, room membership, WebSocket streaming, room storage, HTTP API and Sites Worker.
 - `src/physics/Chassis.js`: Cannon chassis, four-wheel suspension, contact materials and physical force application.
 - `src/physics/StabilityAssist.js`: bounded slide/tilt recovery with normal-corner, handbrake and airborne gates.
 - `src/physics/Terrain.js`: shared heightfield generation and height queries.
@@ -115,7 +145,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 72 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed one-keyboard/three-pad isolation and the one-keyboard cap, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 83 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed one-keyboard/three-pad isolation and the one-keyboard cap, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

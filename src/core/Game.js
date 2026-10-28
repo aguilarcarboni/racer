@@ -8,6 +8,7 @@ import { getKeyboardCount } from "./KeyboardProfiles.js";
 import { InputController } from "./InputController.js";
 import { LocalRaceGate } from "./LocalRaceGate.js";
 import { LocalControllers } from "./LocalControllers.js";
+import { OnlineRace } from "../online/OnlineRace.js";
 import { Telemetry } from "./Telemetry.js";
 import { installVehicleContacts } from "../physics/Chassis.js";
 import { VEHICLE } from "../physics/VehicleConfig.js";
@@ -81,24 +82,56 @@ export class Game {
       getDebugState: () => this.car.getDebugState(),
       setTuning: (values) => this.race.setTuning(values),
     });
+    this.online = new OnlineRace({
+      world: this.world,
+      race: this.race,
+      track: this.track,
+      views: this.views,
+      hud: this.hud,
+      onEnter: () => {
+        this.lobby.hide();
+        this.configurePlayers(1, 1);
+        document.body.classList.add("online-mode");
+        document.querySelector(".session-name").innerHTML =
+          "<i></i> ONLINE RACE <span>VALLE</span>";
+        document.querySelector("#pause-screen h2").textContent =
+          "You're paused.";
+        document.getElementById("online-pause-hint").hidden = false;
+      },
+      onExit: () => {
+        document.body.classList.remove("online-mode");
+        document.getElementById("online-connection").hidden = true;
+        document.querySelector("#pause-screen h2").textContent =
+          "Take a breath.";
+        document.getElementById("online-pause-hint").hidden = true;
+        this.configurePlayers(1, 1);
+        this.setPaused(false);
+      },
+      onMenu: (visible = true) => this.setPaused(visible),
+    });
     this.input.onReset = () => this.reset();
     this.input.onToggleCamera = (i) => {
       if (!this.lobby.visible) this.toggleCameraMode(i);
     };
     this.input.onShiftUp = (i) => {
-      if (!this.lobby.visible && !this.paused) this.players[i]?.car.shiftUp();
+      if (!this.online?.active && !this.lobby.visible && !this.paused)
+        this.players[i]?.car.shiftUp();
     };
     this.input.onShiftDown = (i) => {
-      if (!this.lobby.visible && !this.paused) this.players[i]?.car.shiftDown();
+      if (!this.online?.active && !this.lobby.visible && !this.paused)
+        this.players[i]?.car.shiftDown();
     };
     this.input.onTelemetry = (e) =>
       this.telemetry.input(
         e,
-        this.players[(e.player ?? 1) - 1].car.getDebugState(),
+        (this.online?.active
+          ? this.online.own.car
+          : this.players[(e.player ?? 1) - 1].car
+        ).getDebugState(),
       );
     this.input.onPause = () => this.handlePause();
     this.input.onToggleTransmission = () => {
-      if (!this.lobby.visible && !this.paused)
+      if (!this.online?.active && !this.lobby.visible && !this.paused)
         this.players[0]?.car.toggleAutomatic();
     };
     this.input.onToggleGuide = () => {
@@ -109,8 +142,12 @@ export class Game {
     };
     this.controllers.readers.forEach((reader, i) => {
       reader.onToggleCamera = () => this.toggleCameraMode(i);
-      reader.onShiftUp = () => this.race.getPlayers()[i]?.car.shiftUp();
-      reader.onShiftDown = () => this.race.getPlayers()[i]?.car.shiftDown();
+      reader.onShiftUp = () => {
+        if (!this.online?.active) this.race.getPlayers()[i]?.car.shiftUp();
+      };
+      reader.onShiftDown = () => {
+        if (!this.online?.active) this.race.getPlayers()[i]?.car.shiftDown();
+      };
       reader.onTelemetry = (e) => {
         const car = this.race.getPlayers()[i]?.car;
         if (car) this.telemetry.input(e, car.getDebugState());
@@ -133,6 +170,7 @@ export class Game {
       resume: () => this.handlePause(),
       "line-button": () => this.input.onToggleGuide(),
       "local-race": () => this.openLocal(),
+      "online-race": () => this.online.open(),
     };
     for (const [id, fn] of Object.entries(buttons))
       document.getElementById(id).addEventListener("click", (e) => {
@@ -188,6 +226,7 @@ export class Game {
     });
   }
   openLocal() {
+    if (this.online?.active || this.online?.visible) this.online.leave();
     if (this.playerCount === 1) this.configurePlayers(2, 0);
     this.lobby.show();
     this.accumulator = 0;
@@ -215,6 +254,10 @@ export class Game {
     this.lobby.configure(this.players, this.keyboardPlayers, this.orientation);
   }
   reset() {
+    if (this.online?.active) {
+      this.online.reset();
+      return;
+    }
     this.race.reset();
     this.advance.reset();
     this.views.reset();
@@ -229,6 +272,11 @@ export class Game {
     console.info("[Camera:mode]", { player: index + 1, mode });
   }
   handlePause() {
+    if (this.online?.visible) {
+      if (!this.online.active || this.online.room?.snapshot)
+        this.online.closeMenu();
+      return;
+    }
     if (this.lobby.visible) {
       if (this.controllers.ready) this.startLocal();
       else this.previewGrid();
@@ -243,7 +291,8 @@ export class Game {
   setPaused(value) {
     this.paused = value;
     this.accumulator = 0;
-    this.input.clear();
+    if (value) this.input.clear();
+    if (value && this.online?.active) this.online.setIdle();
     console.info("[Game:pause]", { paused: value });
   }
   resize() {
@@ -264,8 +313,17 @@ export class Game {
       allowJoin:
         this.playerCount > 1 && (this.lobby.visible || !this.controllers.ready),
       actionsEnabled:
-        !this.lobby.visible && !this.paused && this.controllers.ready,
+        !this.lobby.visible &&
+        !this.online?.visible &&
+        !this.paused &&
+        this.controllers.ready,
     });
+    if (this.online?.active) {
+      this.online.tick(dt, inputs[0], this.paused);
+      document.getElementById("pause-screen").hidden =
+        !this.paused || this.online.visible;
+      return;
+    }
     const ready = this.controllers.ready;
     const gate = () =>
       this.advance.getMode({
