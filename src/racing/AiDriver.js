@@ -133,7 +133,10 @@ export class AiDriver {
     );
     const steerLimit = Math.min(
       VEHICLE.maxSteer,
-      Math.atan((11.5 * VEHICLE.wheelbase) / (speed * speed + 25)),
+      Math.atan(
+        (VEHICLE.steeringAcceleration * VEHICLE.wheelbase) /
+          (speed * speed + 25),
+      ),
     );
     let steerAxis = clamp(delta / steerLimit, -1, 1);
     if (Math.abs(heading) > 1.25) targetSpeed = Math.min(targetSpeed, 3);

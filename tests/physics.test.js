@@ -298,11 +298,11 @@ test("braking retains rear cornering force even with a rearward setup", () => {
   assert.ok(state.rearGripReserve > 0.7);
   assert.ok(state.rearBrakeForce > 0);
 });
-test("five-second acceleration is about 20 percent quicker than the previous tune", () => {
+test("five-second acceleration reaches the faster arcade pace without losing traction", () => {
   const r = rig();
   r.run(5, throttle);
   const speed = r.body.velocity.length() * 3.6;
-  assert.ok(speed > 80 && speed < 86, `five-second speed: ${speed}`);
+  assert.ok(speed > 108 && speed < 118, `five-second speed: ${speed}`);
 });
 
 test("turn-in at 90 km/h is prompt without excessive sideslip", () => {

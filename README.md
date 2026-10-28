@@ -66,10 +66,10 @@ Rendering uses one shared scene, one physics world and one WebGL renderer, with 
 
 The goal is approachable, believable arcade handling: progressive grip, useful braking, recoverable slides and a lively road. [iRacing Arcade's official introduction](https://www.iracing.com/introducing-iracing-arcade/) describes accessible racing that remains rewarding to master. That is a design reference; this project uses its own simplified vehicle model and is not a recreation of that game's physics.
 
-- Four raycast spring/damper wheels support a freely pitching and rolling chassis.
+- Four raycast spring/damper wheels support a freely pitching and rolling chassis. Increased pitch/roll inertia resists tipping without locking rotation.
 - Rendered terrain and wheel collision queries use the same sampled heightfield. Road undulation is physical; raised curb strips have their own collision mesh.
 - Front/rear slip angles include yaw velocity at each axle. Smooth tire-force saturation and a combined friction circle limit lateral and longitudinal grip together.
-- Traction control reserves rear cornering grip under full throttle. The old separate target-yaw controller is removed; low-speed steering blends into the tire model.
+- Traction control reserves rear cornering grip under full throttle. A tunable arcade recovery assist applies bounded yaw torque and drag only when sideslip is worsening; grounded tilt/rate assistance helps a bumped chassis stay balanced. Handbrake slides bypass yaw recovery. Assistance never rewrites velocity or orientation and is inactive in the air. The old separate target-yaw controller is removed; low-speed steering blends into the tire model.
 - Steering is smoothed and limited with speed. Keyboard and controller steering both follow the requested reversed mapping.
 - Braking reserves tire capacity for cornering on both axles, with gentler full-lock steering under hard braking. A stronger rear axle and reduced load-transfer sensitivity favor recoverable understeer over a sudden spin.
 - Brakes remain effective when throttle is held. Automatic shifting and brake-to-reverse make the default drive accessible, while manual shifting remains available.
@@ -98,7 +98,8 @@ The lap timer starts at the gantry. Ordered quarter-lap checkpoints prevent a sh
 - `src/physics/TireModel.js`: smooth friction-circle tire saturation.
 - `src/physics/PowertrainModel.js`: gear selection, drive force, braking and reverse.
 - `src/physics/VehicleConfig.js`: dimensions, physical constants and defaults.
-- `src/physics/Chassis.js`: Cannon chassis and four-wheel suspension construction.
+- `src/physics/Chassis.js`: Cannon chassis, four-wheel suspension, contact materials and physical force application.
+- `src/physics/StabilityAssist.js`: bounded slide/tilt recovery with normal-corner, handbrake and airborne gates.
 - `src/physics/Terrain.js`: shared heightfield generation and height queries.
 - `src/models/TrackLayout.js`: closed spline, sampling, nearest path and surface classification.
 - `src/models/Track.js`: road meshes, physical curbs/barriers, spawn and circuit scenery.
@@ -119,7 +120,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 65 behavior tests, including mixed two-keyboard/one-pad isolation, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 72 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed two-keyboard/one-pad isolation, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 
@@ -127,6 +128,16 @@ Browser console/error messages still mirror to the Vite terminal. Periodic `[Tel
 
 ## Current handling tune
 
-Engine power is 168 kW and peak drive force is 5,760 N, both 20% above the previous tune. Forward gear speed ranges are also 20% higher. The matched five-second acceleration check rises from 69.23 to 83.27 km/h (+20.3%); this is not a claim that every lap is 20% faster.
+Engine power is 230 kW, peak drive force 7,800 N and the final gear governor is 84 m/s. Surface grip, tire stiffness and the speed-dependent steering allowance rise together, with rear grip and brake reserves retained. AI and racing-line speed profiles use the new pace. Car-to-car friction/restitution are configured explicitly so light contact slides rather than snagging against generic materials. Car setup exposes **Stability assistance** from zero to one (default 0.85), shared among local human cars.
 
-Front grip remains adjustable at a default multiplier of 1.20. Steering response is quicker, and front cornering stiffness is 88,000 N/rad for stronger turn-in. Front cornering force stays within the counter-moment the rear axle can support as braking/drive consumes its grip; handbrake rotation bypasses this balance aid. Rear grip and cornering stiffness are stronger, default pitch/cornering load sensitivity is lower, and rear rotation is reduced. ABS-style force limits retain lateral grip while braking. Hard braking softens maximum steering at road speed to avoid a sudden tightening radius as the car slows. Tire-force limits and physical suspension still apply; handbrake slides and off-track grip loss remain possible. These are game-model parameters, not measured real-car specifications.
+Matched flat-road measurements against commit 820cfa9:
+
+| Measurement                                | Previous      | Current       |
+| ------------------------------------------ | ------------- | ------------- |
+| 0-100 km/h, automatic/full throttle        | 6.07 s        | 4.41 s        |
+| Speed after five seconds                   | 83.27 km/h    | 112.63 km/h   |
+| Severe rear-quarter contact: peak sideslip | 73.25 degrees | 29.83 degrees |
+
+These are deterministic simulation comparisons, not guaranteed lap-time gains or a licensed real-car calibration. In the current chassis, a high side impulse at an elevated contact point reaches about 24.6 degrees of tilt with default assistance and returns onto four wheels; the same impulse with assistance disabled exceeds 90 degrees. Severe impacts can still stop or overturn a car; R restarts the race.
+
+The handling references are [iRacing Arcade](https://iracingarcade.com/), [Karting Superstars](https://store.steampowered.com/app/2503220/Karting_Superstars/) and [Circuit Superstars](https://store.steampowered.com/app/1097130/Circuit_Superstars/). Their official descriptions emphasize accessible, tactile handling and skill in grip/racing lines. Our implementation translates that design direction into more speed and a larger recovery window; it does not reproduce their proprietary physics.

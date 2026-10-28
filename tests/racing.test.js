@@ -8,7 +8,11 @@ import { RaceSession } from "../src/racing/RaceSession.js";
 import { DEFAULT_TUNE } from "../src/physics/VehicleConfig.js";
 import { LINE, OPPONENTS, RACE } from "../src/racing/RaceConfig.js";
 import { Terrain } from "../src/physics/Terrain.js";
-import { createChassis, applyDrive } from "../src/physics/Chassis.js";
+import {
+  createChassis,
+  applyDrive,
+  installVehicleContacts,
+} from "../src/physics/Chassis.js";
 import { VehicleDynamics } from "../src/physics/VehicleDynamics.js";
 const layout = new TrackLayout(),
   profile = new RacingLineProfile(layout);
@@ -207,12 +211,7 @@ test("physical opponents clear a stationary grid car and complete three racing l
     ground = new C.Material(),
     carMaterial = new C.Material();
   terrain.createBody(world, ground);
-  world.addContactMaterial(
-    new C.ContactMaterial(ground, carMaterial, {
-      friction: 0.05,
-      restitution: 0.08,
-    }),
-  );
+  installVehicleContacts(world, ground, carMaterial);
   const field = [...OPPONENTS, { id: "you", slot: 2 }].map((config) => {
     const p = layout.sample(
         0.02 - 0.003 - (config.slot * RACE.spacing) / layout.length,

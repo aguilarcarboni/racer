@@ -5,9 +5,9 @@ export const RACE = Object.freeze({
   lane: 2,
 });
 export const LINE = Object.freeze({
-  lateralAcceleration: 7,
-  brakingDeceleration: 6.5,
-  maxSpeed: 40.8,
+  lateralAcceleration: 9,
+  brakingDeceleration: 7.5,
+  maxSpeed: 49,
   minSpeed: 10.5,
   amberRatio: 0.94,
   redRatio: 1.05,

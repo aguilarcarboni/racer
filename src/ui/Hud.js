@@ -41,6 +41,7 @@ export class Hud {
       ["tuneRearDrop", "valRearDrop", "rearGripDrop"],
       ["tuneSuspension", "valSuspension", "suspensionStiffness"],
       ["tuneFrontGrip", "valFrontGrip", "frontGrip"],
+      ["tuneStability", "valStability", "stabilityAssist"],
     ];
     const initial = car.getDebugState();
     for (const [id, value, key] of controls) {

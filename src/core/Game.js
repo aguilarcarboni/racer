@@ -9,6 +9,7 @@ import { InputController } from "./InputController.js";
 import { LocalRaceGate } from "./LocalRaceGate.js";
 import { LocalControllers } from "./LocalControllers.js";
 import { Telemetry } from "./Telemetry.js";
+import { installVehicleContacts } from "../physics/Chassis.js";
 import { VEHICLE } from "../physics/VehicleConfig.js";
 import { SplitScreenRenderer } from "../view/SplitScreenRenderer.js";
 import { Hud } from "../ui/Hud.js";
@@ -48,12 +49,7 @@ export class Game {
     this.container.append(this.renderer.domElement);
     const ground = new CANNON.Material("ground"),
       carMat = new CANNON.Material("car");
-    this.world.addContactMaterial(
-      new CANNON.ContactMaterial(ground, carMat, {
-        friction: 0.05,
-        restitution: 0.08,
-      }),
-    );
+    installVehicleContacts(this.world, ground, carMat);
     this.track = new Track(this.scene);
     this.track.create(this.world, ground);
     this.car = new Car(this.scene, this.world, carMat);

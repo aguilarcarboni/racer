@@ -14,6 +14,7 @@ export class Car {
     this.spawnYaw = 0;
     this.surface = "asphalt";
     this.contacts = 0;
+    this.balanceTorque = 0;
     this.lastContactAt = 0;
   }
   create(spawn) {
@@ -50,7 +51,11 @@ export class Car {
       grounded,
     };
     const forces = this.dynamics.compute(state, input, dt, surface);
-    applyDrive(this.body, forces, this.dynamics.tuning);
+    this.balanceTorque = applyDrive(
+      this.body,
+      forces,
+      this.dynamics.tuning,
+    ).balanceTorque;
     for (let i = 0; i < 2; i++)
       this.vehicle.setSteeringValue(forces.steerAngle, i);
   }
@@ -60,11 +65,13 @@ export class Car {
   reset() {
     this.body.position.copy(this.startPosition);
     this.body.quaternion.setFromEuler(0, this.spawnYaw, 0);
+    this.body.updateInertiaWorld(true);
     for (const key of ["velocity", "angularVelocity", "force", "torque"])
       this.body[key].set(0, 0, 0);
     this.body.aabbNeedsUpdate = true;
     this.body.wakeUp();
     this.dynamics.reset();
+    this.balanceTorque = 0;
     this.vehicle.wheelInfos.forEach((w) => {
       w.suspensionLength = VEHICLE.restLength;
       w.isInContact = false;
@@ -127,6 +134,7 @@ export class Car {
       contacts = this.vehicle.wheelInfos.filter((w) => w.isInContact).length;
     return {
       ...state,
+      balanceTorque: this.balanceTorque,
       position: { x: p.x, y: p.y, z: p.z },
       velocity: { x: v.x, y: v.y, z: v.z },
       angularVelocity: { x: av.x, y: av.y, z: av.z },

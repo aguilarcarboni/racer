@@ -13,17 +13,22 @@ export const VEHICLE = Object.freeze({
   rebound: 4.8,
   travel: 0.22,
   maxSuspensionForce: 16000,
-  frontCornering: 88000,
-  rearCornering: 88000,
-  rearGrip: 1.14,
+  frontCornering: 105000,
+  rearCornering: 112000,
+  rearGrip: 1.18,
   brakeGripUse: 0.7,
   brakeSteerReduction: 0.35,
   maxSteer: 0.52,
+  steeringAcceleration: 14,
+  pitchInertiaScale: 1.6,
+  rollInertiaScale: 2.2,
+  slideRecoveryRate: 3500,
+  balanceRate: 6200,
   steerResponse: 11,
-  power: 168000,
-  driveForce: 5760,
+  power: 230000,
+  driveForce: 7800,
   brakeForce: 13800,
-  topSpeed: 74.4,
+  topSpeed: 84,
   fixedStep: 1 / 120,
 });
 export const DEFAULT_TUNE = Object.freeze({
@@ -33,23 +38,24 @@ export const DEFAULT_TUNE = Object.freeze({
   rearGripDrop: 0.06,
   suspensionStiffness: 32,
   frontGrip: 1.2,
+  stabilityAssist: 0.85,
 });
 export const clamp = (x, a, b) =>
   Math.max(a, Math.min(b, Number.isFinite(x) ? x : a));
 export const approach = (value, target, rate, dt) =>
   value + (target - value) * (1 - Math.exp(-rate * dt));
 
-export const GEAR_SPEEDS = Object.freeze([
-  0,
-  18,
-  30,
-  43.2,
-  57.6,
-  VEHICLE.topSpeed,
-]);
+export const GEAR_SPEEDS = Object.freeze([0, 21, 35, 50, 66, VEHICLE.topSpeed]);
 export const SURFACE_GRIP = Object.freeze({
-  asphalt: 1.3,
-  curb: 1.18,
+  asphalt: 1.55,
+  curb: 1.42,
   gravel: 0.76,
   grass: 0.55,
+});
+
+export const CONTACT = Object.freeze({
+  groundFriction: 0.05,
+  groundRestitution: 0.08,
+  carFriction: 0.1,
+  carRestitution: 0.02,
 });

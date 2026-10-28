@@ -5,6 +5,7 @@ import {
   clamp,
   approach,
 } from "./VehicleConfig.js";
+import { StabilityAssist } from "./StabilityAssist.js";
 import { axleForce } from "./TireModel.js";
 import { PowertrainModel } from "./PowertrainModel.js";
 export class VehicleDynamics {
@@ -32,6 +33,8 @@ export class VehicleDynamics {
       rearGripReserve: 1,
       frontLateralLimit: 0,
       rearLateralCapacity: 0,
+      recoveryTorque: 0,
+      recoveryDrag: 0,
     };
   }
   setTuning(values) {
@@ -42,6 +45,7 @@ export class VehicleDynamics {
       ["rearGripDrop", 0, 0.45],
       ["suspensionStiffness", 20, 50],
       ["frontGrip", 0.85, 1.45],
+      ["stabilityAssist", 0, 1],
     ])
       if (Number.isFinite(values[key]))
         this.tuning[key] = clamp(values[key], min, max);
@@ -59,7 +63,10 @@ export class VehicleDynamics {
     // Keyboard full lock remains useful at speed, with finite lateral grip rather than forced yaw.
     const steerLimit = Math.min(
       VEHICLE.maxSteer,
-      Math.atan((11.5 * VEHICLE.wheelbase) / (speed * speed + 25)),
+      Math.atan(
+        (VEHICLE.steeringAcceleration * VEHICLE.wheelbase) /
+          (speed * speed + 25),
+      ),
     );
     // Soften full-lock steering during hard braking at road speed. Keyboard
     // drivers can keep turning without demanding a tightening radius as speed falls.
@@ -175,6 +182,14 @@ export class VehicleDynamics {
       r.longitudinal -
       dynamicBlend * f.lateral * Math.sin(angle) -
       resistance;
+    const recovery = StabilityAssist.slide(
+      state,
+      input.handbrake,
+      this.tuning.stabilityAssist,
+      mu,
+    );
+    torque += recovery.torque;
+    fz -= sign * Math.min(recovery.drag, (speed * mass) / Math.max(dt, 0.001));
     if (!grounded) {
       fx = 0;
       fz = -sign * 0.5 * speed * speed;
@@ -184,6 +199,8 @@ export class VehicleDynamics {
     this.lastLateral = approach(this.lastLateral, fx / mass, 4, dt);
     this.debug = {
       driveForce: fz,
+      recoveryTorque: recovery.torque,
+      recoveryDrag: recovery.drag,
       yawTorque: torque,
       frontSlip,
       rearSlip,
@@ -210,6 +227,7 @@ export class VehicleDynamics {
       torque,
       steerAngle: angle,
       ...controls,
+      grounded,
     };
   }
   getState(speed) {

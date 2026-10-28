@@ -1,5 +1,6 @@
 import * as CANNON from "cannon-es";
-import { VEHICLE } from "./VehicleConfig.js";
+import { StabilityAssist } from "./StabilityAssist.js";
+import { VEHICLE, CONTACT } from "./VehicleConfig.js";
 export function createChassis(world, material, spawn) {
   const body = new CANNON.Body({
     mass: VEHICLE.mass,
@@ -11,8 +12,17 @@ export function createChassis(world, material, spawn) {
     new CANNON.Box(new CANNON.Vec3(0.76, 0.18, 1.55)),
     new CANNON.Vec3(0, 0.08, 0),
   );
+  // Spread pitch/roll inertia without changing the collision hull or steering yaw inertia.
+  body.inertia.x *= VEHICLE.pitchInertiaScale;
+  body.inertia.z *= VEHICLE.rollInertiaScale;
+  body.invInertia.set(
+    1 / body.inertia.x,
+    1 / body.inertia.y,
+    1 / body.inertia.z,
+  );
   body.position.set(spawn.x, spawn.y, spawn.z);
   body.quaternion.setFromEuler(0, spawn.yaw || 0, 0);
+  body.updateInertiaWorld(true);
   body.allowSleep = false;
   body.updateAABB();
   const vehicle = new CANNON.RaycastVehicle({
@@ -60,4 +70,28 @@ export function applyDrive(body, forces, tuning) {
     new CANNON.Vec3(0, -0.16 * (tuning.weightTransferLong / 0.25), 0),
   );
   body.torque.y += forces.torque;
+  const balance = StabilityAssist.balance(
+    body.vectorToWorldFrame(new CANNON.Vec3(0, 1, 0)),
+    body.angularVelocity,
+    forces.grounded,
+    tuning.stabilityAssist ?? 0,
+  );
+  body.torque.x += balance.x;
+  body.torque.z += balance.z;
+  return { balanceTorque: Math.hypot(balance.x, balance.z) };
+}
+
+export function installVehicleContacts(world, ground, car) {
+  world.addContactMaterial(
+    new CANNON.ContactMaterial(ground, car, {
+      friction: CONTACT.groundFriction,
+      restitution: CONTACT.groundRestitution,
+    }),
+  );
+  world.addContactMaterial(
+    new CANNON.ContactMaterial(car, car, {
+      friction: CONTACT.carFriction,
+      restitution: CONTACT.carRestitution,
+    }),
+  );
 }
