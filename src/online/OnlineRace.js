@@ -34,7 +34,7 @@ export class OnlineRace {
       onMenu,
     });
     this.client = new OnlineClient();
-    this.buffer = new SnapshotBuffer();
+    this.buffer = new SnapshotBuffer({ delay: 60, adaptive: true });
     this.prediction = new PredictionHistory();
     this.rotationOffset = new Quaternion();
     this.identityRotation = new Quaternion();

@@ -1,3 +1,4 @@
+import { InputSender } from "./InputSender.js";
 import { unpackRoom } from "./SnapshotCodec.js";
 import { ONLINE, IDLE_INPUT, cleanInput } from "./Protocol.js";
 import { onlineServerUrl } from "./ServerConfig.js";
@@ -32,6 +33,7 @@ export class OnlineClient {
   }
   setInput(input) {
     this.input = cleanInput(input);
+    this.inputSender?.update(this.input);
   }
   async api(path, extra = {}, session = this.session) {
     const started = performance.now(),
@@ -59,7 +61,8 @@ export class OnlineClient {
         throw error;
       }
       const rtt = performance.now() - started;
-      this.latency = this.latency ? this.latency * 0.7 + rtt * 0.3 : rtt;
+      if (!this.streaming || !this.streamLatency)
+        this.latency = this.latency ? this.latency * 0.7 + rtt * 0.3 : rtt;
       return { data, rtt, sentAt: started };
     } catch (error) {
       if (error.name === "AbortError")
@@ -161,6 +164,7 @@ export class OnlineClient {
       this.accept(result);
     } catch (error) {
       if (generation !== this.generation) return;
+      this.connectionStatus = "reconnecting";
       this.onStatus?.("reconnecting");
       this.onError?.(error);
       delay = 1200;
@@ -203,17 +207,24 @@ export class OnlineClient {
           if (!this.streaming) {
             this.streaming = true;
             this.reconnectDelay = 500;
-            let lastPing = -Infinity;
-            this.streamTimer = setInterval(() => {
+            this.inputSender = new InputSender((input) => {
               if (socket.readyState !== 1 || generation !== this.generation)
-                return;
+                return false;
               socket.send(
                 JSON.stringify({
                   type: "input",
                   sequence: ++this.sequence,
-                  input: this.input,
+                  input,
                 }),
               );
+              return true;
+            });
+            this.inputSender.update(this.input);
+            let lastPing = -Infinity;
+            this.streamTimer = setInterval(() => {
+              if (socket.readyState !== 1 || generation !== this.generation)
+                return;
+              this.inputSender.heartbeat();
               if (performance.now() - lastPing > 2000) {
                 lastPing = performance.now();
                 socket.send(JSON.stringify({ type: "ping", at: lastPing }));
@@ -255,11 +266,13 @@ export class OnlineClient {
       if (generation !== this.generation) return;
       this.streaming = false;
       clearInterval(this.streamTimer);
+      this.inputSender?.stop();
       if (code === 1000 && reason === "Session resumed elsewhere") {
         this.clearSession();
         this.onError?.(new Error("This player reconnected in another tab."));
         return;
       }
+      this.connectionStatus = "reconnecting";
       this.onStatus?.("reconnecting");
       this.reconnectTimer = setTimeout(
         () => this.openStream(generation),
@@ -279,6 +292,8 @@ export class OnlineClient {
     clearTimeout(this.timer);
     clearTimeout(this.reconnectTimer);
     clearInterval(this.streamTimer);
+    this.inputSender?.stop();
+    this.inputSender = null;
     this.streaming = false;
     this.connectionStatus = null;
     this.clockOffset = undefined;

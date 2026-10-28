@@ -21,25 +21,44 @@ export function mixPose(a, b, t) {
   };
 }
 export class SnapshotBuffer {
-  constructor() {
+  constructor({ delay = 120, adaptive = false } = {}) {
+    this.delay = delay;
+    this.adaptive = adaptive;
+    this.jitter = 0;
     this.frames = [];
   }
   clear() {
     this.frames = [];
   }
   push(cars, time) {
+    const previous = this.frames.at(-1),
+      received = performance.now();
+    if (this.adaptive && previous && time > previous.time) {
+      const interval = time - previous.time;
+      this.jitter =
+        this.jitter * 0.9 +
+        Math.abs(received - this.lastReceived - interval) * 0.1;
+      const target = Math.max(
+        50,
+        Math.min(100, interval * 1.5 + this.jitter * 2),
+      );
+      this.delay += (target - this.delay) * 0.15;
+    }
+    this.lastReceived = received;
+    // A better clock measurement can move the estimated server timeline backwards.
+    this.frames = this.frames.filter((frame) => frame.time < time);
     this.frames.push({ cars, time });
     if (this.frames.length > 12) this.frames.shift();
   }
   pose(id, time) {
     if (!this.frames.length) return null;
-    const target = time - 120;
+    const target = time - this.delay;
     const b = this.frames.find((f) => f.time >= target) ?? this.frames.at(-1);
     const bi = this.frames.indexOf(b),
       a = this.frames[Math.max(0, bi - 1)];
     const pa = a.cars.find((c) => c.id === id).physics.pose,
       pb = b.cars.find((c) => c.id === id).physics.pose;
-    if (target <= b.time || a !== b)
+    if (target <= b.time)
       return mixPose(
         pa,
         pb,

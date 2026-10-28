@@ -33,7 +33,7 @@ A standard gamepad uses the left stick to steer, triggers to accelerate/brake, t
 
 Choose **Online** to create a lobby or join with a six-character code. Each browser/device gets one car and uses keyboard or a controller. The host shares the code or invite link; every player clicks **I'm ready**, then the host clicks **Start race**. Rooms allow two to four human players, with AI filling spare grid spots. Online play is full-screen per device. **Offline** retains solo and local split-screen, with at most one keyboard player.
 
-The dedicated Node/WebSocket server owns physics, collisions, lap gates, classification and the shared countdown. Browsers send controls at 20 Hz, replay their recent controls when correcting their own car, and interpolate remote cars. Compact versioned snapshots transmit the necessary physical state instead of duplicate debug/tuning objects. The physical world advances at 120 Hz; clients never submit positions or lap results. HTTP handles lobby actions and reconnect fallback; race updates stream without a database round trip. The frontend remains on ChatGPT Sites.
+The dedicated Node/WebSocket server owns physics, collisions, lap gates, classification and the shared countdown. Browsers send changed controls immediately (rate-limited to 50 Hz) with a 20 Hz heartbeat, replay their recent controls when correcting their own car, and interpolate remote cars. Compact versioned snapshots transmit the necessary physical state instead of duplicate debug/tuning objects. The server processes rooms at 60 Hz and broadcasts snapshots at 30 Hz. The physical world advances at 120 Hz; clients never submit positions or lap results. HTTP handles lobby actions and reconnect fallback; race updates stream without a database round trip. The frontend remains on ChatGPT Sites.
 
 A player can rejoin with its saved session after a reload. Input silence brakes after 700 ms without engaging reverse. Disconnected players have a 30-second grace period before DNF; leaving transfers host control. Online pause/menu access brakes only that player's car. The host can start another round after everyone finishes or withdraws. Rooms expire after 30 minutes of inactivity. Session tokens are hashed server-side and never included in other players' views or logs.
 
@@ -41,10 +41,10 @@ This is an online prototype: latency/packet loss can cause corrections, and four
 
 `npm run dev` includes the same real-time room service on Vite's HTTP/WebSocket server. `npm run server` runs the standalone server on port 8080; `PORT` and comma-separated `ALLOWED_ORIGINS` configure it. Tests retain a real SQLite adapter to check the legacy storage contract. The production Sites Worker serves bundled assets and forwards legacy HTTP room requests; the current browser connects directly to the dedicated server. Applied D1 migrations remain unchanged for deployment history, but D1 is outside the real-time loop.
 
-Hosting: Google Cloud project `eaglenest-507101`, service `racer-online`, region `us-central1`. `racer-build` has Cloud Run Builder; `racer-runtime` has no project resource roles. The service scales from zero to one instance, with a one-hour WebSocket request timeout and client reconnect. The public endpoint is tracked in `src/online/ServerConfig.js`. Production static builds use it; development stays on the local server.
+Hosting: Google Cloud project `eaglenest-507101`, service `racer-online`, region `us-east1`. `racer-build` has Cloud Run Builder; `racer-runtime` has no project resource roles. The service scales from zero to one instance, with a one-hour WebSocket request timeout and client reconnect. The public endpoint is tracked in `src/online/ServerConfig.js`. Production static builds use it; development stays on the local server.
 
 ```sh
-gcloud run deploy racer-online --source=. --region=us-central1 \
+gcloud run deploy racer-online --source=. --region=us-east1 \
   --project=eaglenest-507101 --account=aguilarcarboni@gmail.com \
   --build-service-account=projects/eaglenest-507101/serviceAccounts/racer-build@eaglenest-507101.iam.gserviceaccount.com \
   --service-account=racer-runtime@eaglenest-507101.iam.gserviceaccount.com \
@@ -53,9 +53,11 @@ gcloud run deploy racer-online --source=. --region=us-central1 \
   --set-env-vars=ALLOWED_ORIGINS=https://racer-valle-motor-park.aguilarcarboni173810.chatgpt.site
 ```
 
-Current optimized hosted measurements: four clients had 129 ms median round trip and 215 KiB/s aggregate outbound, about 0.74 GiB per full-lobby hour (previously 1,067 KiB/s). Two humans plus two physical AI had 122 ms median round trip and 99 KiB/s aggregate outbound. The server now uses 2 CPUs / 1 GiB RAM, still min zero/max one instance. Typical measured 95th-percentile simulation windows were 16 ms for four humans and 18-37 ms with two AI, against a 50 ms stream interval. These short probes do not replace a friends-on-separate-networks playtest.
+Current South Carolina hosted measurements: four clients had 98 ms median round trip, 40-46 ms latest snapshot ages and 328 KiB/s aggregate outbound (about 1.13 GiB per full-lobby hour). Two humans plus two physical AI had 99 ms median round trip and 150 KiB/s aggregate outbound. Both probes ran concurrently; measured inter-client clock spread was zero, with 0.009 s and 0.015 s clock drift respectively. Previous Iowa measurements were 122-129 ms round trip. These short protocol tests do not replace separate-device playtesting.
 
-At current Google compute/network rates, a gross planning estimate is US$0.27-0.33 per four-player hour before available free allowances; destination, usage, build/storage and taxes affect the bill. This is an estimate, not a spending cap.
+InputSender avoids waiting for the next heartbeat when controls change and coalesces rapid analog updates. SnapshotBuffer uses a shorter adaptive presentation window and bounded velocity extrapolation across a missing frame. The ping label uses live WebSocket measurements rather than mixing in lobby HTTP timings. Accepted steering, grip, engine, suspension and stability parameters are unchanged.
+
+The service still uses 2 CPUs / 1 GiB RAM and min zero/max one instance. At current Google compute/network rates, the 30 Hz update cadence implies a gross planning estimate of US$0.32-0.40 per four-player hour before available free allowances; destination, usage, build/storage and taxes affect the bill. This is an estimate, not a spending cap.
 
 
 ## Local split screen
@@ -148,7 +150,7 @@ No outside game assets were copied. Car and paddock models are reused from the e
 
 ## Checks
 
-`npm test` runs 87 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed one-keyboard/three-pad isolation and the one-keyboard cap, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
+`npm test` runs 92 behavior tests, including large-spin recovery, real mirrored rear-quarter/crossing impacts, roll-impulse recovery, full-lock braking from 180 km/h, mixed one-keyboard/three-pad isolation and the one-keyboard cap, keyboard release/camera/shift routing, controller isolation/reconnection, local finish order, parked/pause gates, viewport bounds and a four-car input isolation drive. It also runs behavior tests for race starts, classification, finishes, speed guidance and physical opponents, alongside existing handling checks, including a conservative simulated drive around the actual undulating circuit, suspension over a raised curb, steering direction, recovery from a yaw disturbance, braking with throttle, auto gears, reverse, off-road speed loss, lap gates and deterministic fixed-step behavior.
 
 `npm run build` creates `dist/`. `npm run preview` serves it at http://127.0.0.1:4173. Three.js/Cannon produce a large initial JavaScript chunk; Vite's bundle-size advisory is retained. CI runs install, tests and build. The upgraded Vite toolchain audits clean at this revision.
 

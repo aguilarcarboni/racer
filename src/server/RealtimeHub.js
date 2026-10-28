@@ -9,13 +9,14 @@ export class RealtimeHub {
     this.peers = new Set();
     this.busy = false;
     this.lobbySentAt = new Map();
+    this.frameDueAt = new Map();
     this.sockets = new WebSocketServer({
       noServer: true,
       maxPayload: 4096,
       perMessageDeflate: false,
     });
     this.sockets.on("connection", (socket) => this.connect(socket));
-    this.timer = setInterval(() => this.broadcast(), 50);
+    this.timer = setInterval(() => this.broadcast(), 1000 / 60);
     this.timer.unref?.();
   }
   attach(server) {
@@ -144,6 +145,12 @@ export class RealtimeHub {
           Date.now() - (this.lobbySentAt.get(code) ?? 0) < 500
         )
           continue;
+        const now = Date.now();
+        if (row.room.sim) {
+          const due = this.frameDueAt.get(code) ?? now;
+          if (now < due) continue;
+          this.frameDueAt.set(code, Math.max(due + 1000 / 30, now));
+        }
         this.lobbySentAt.set(code, Date.now());
         const snapshot = row.room.sim
           ? this.service.simulation.snapshot(row.room.sim)
